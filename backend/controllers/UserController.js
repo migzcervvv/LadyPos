@@ -1,0 +1,134 @@
+import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import { generateToken } from '../utils/generateToken.js';
+// Create a new user
+export async function createUser(req, res) {
+    try {
+        const { identifier, password } = req.body;
+
+        const userExists = await User.findOne({ identifier: identifier.toLowerCase() });
+        if (userExists) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = await User.create({
+            identifier: identifier.toLowerCase(),
+            password: hashedPassword,
+            role: 'user' // default role
+        });
+
+        res.status(201).json({
+            _id: user._id,
+            identifier: user.identifier,
+            role: user.role,
+            token: generateToken(user)
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+// LOGIN
+export async function loginUser(req, res) {
+    try {
+        const { identifier, password } = req.body;
+
+        const user = await User.findOne({ identifier: identifier.toLowerCase() });
+        const passwordCorrect = user ? await bcrypt.compare(password, user.password) : false;
+        if (user && passwordCorrect) {
+            res.json({
+                _id: user._id,
+                identifier: user.identifier,
+                role: user.role,
+                token: generateToken(user)
+            });
+        } else {
+            res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+// Get all users
+export async function getUsers(req, res) {
+    try {
+        const users = await User.find(); // use the method on the model
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+// Get user by ID
+export async function getUserById(req, res) {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // 🔒 Only allow if:
+        // - user is requesting themselves
+        // - OR is admin
+        if (req.user.id !== user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+// Update user
+export async function updateUser(req, res) {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (req.user.id !== user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        // Optional: prevent role escalation
+        if (req.body.role && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Cannot change role' });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            { new: true }
+        );
+
+        res.json(updatedUser);
+
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+}
+// Delete user
+export async function deleteUser(req, res) {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Only admin can delete (already enforced in route, but double check is good)
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        await user.deleteOne();
+
+        res.json({ message: 'User deleted' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
