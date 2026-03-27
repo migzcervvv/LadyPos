@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useState, useRef } from "react";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/AuthContext.jsx";
 
 export default function Layout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true); // start open on desktop
   const location = useLocation();
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   const tabs = [
     { name: "Profile", path: "/profile" },
@@ -14,7 +17,7 @@ export default function Layout({ children }) {
     { name: "Orders", path: "/orders" },
     { name: "Debts", path: "/debts" },
     { name: "Finances", path: "/finances" },
-    { name: "Logout", path: "/logout" }, // We'll handle logout specially
+    { name: "Logout", path: "/logout" },
   ];
 
   const handleTabClick = (tab) => {
@@ -27,6 +30,15 @@ export default function Layout({ children }) {
     }
   };
 
+  // Swipe to close
+  const handleTouchStart = (e) => (touchStartX.current = e.touches[0].clientX);
+  const handleTouchMove = (e) => (touchEndX.current = e.touches[0].clientX);
+  const handleTouchEnd = () => {
+    const deltaX = touchStartX.current - touchEndX.current;
+    if (deltaX > 50) setSidebarOpen(false);
+    if (deltaX < -50) setSidebarOpen(true);
+  };
+
   return (
     <div
       className="flex h-screen overflow-hidden"
@@ -34,25 +46,47 @@ export default function Layout({ children }) {
     >
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-(--color-surface) shadow-lg transform transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:shadow-none`}
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[var(--color-surface)] shadow-lg transform transition-transform duration-300 ease-in-out
+    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center justify-center border-b border-(--color-border)">
+        {/* Logo & Close Button */}
+        <div className="h-16 flex items-center justify-between border-b border-[var(--color-border)] px-4">
           <img src="/serveflow.svg" alt="Logo" className="h-10 w-auto" />
+          {/* Close button always visible */}
+          <button
+            className="p-1 rounded hover:bg-[var(--color-secondary)] transition"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <svg
+              className="w-5 h-5 text-[var(--color-text)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="px-4 py-6 space-y-1">
+        <nav className="px-4 py-6 space-y-2">
           {tabs.map((tab) => (
             <button
               key={tab.name}
               onClick={() => handleTabClick(tab)}
-              className={`w-full text-left block px-3 py-2 rounded transition-colors
+              className={`w-full text-left flex items-center px-3 py-2 rounded-lg transition-colors duration-200
                 ${
                   location.pathname === tab.path
-                    ? "bg-(--color-primary) text-white"
-                    : "text-(--color-text) hover:bg-(--color-secondary)"
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text)] hover:bg-[var(--color-secondary)]"
                 }`}
             >
               {tab.name}
@@ -72,12 +106,12 @@ export default function Layout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         {/* Top bar */}
-        <header className="flex items-center h-16 px-4 bg-(--color-surface) shadow md:hidden">
+        <header className="flex items-center h-16 px-4 bg-[var(--color-surface)] shadow">
+          {/* Sidebar toggle button, always visible */}
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent) focus:ring-offset-2 rounded"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] rounded"
           >
-            {/* Hamburger icon */}
             <svg
               className="w-6 h-6"
               fill="none"
@@ -92,7 +126,6 @@ export default function Layout({ children }) {
               />
             </svg>
           </button>
-          <span className="ml-4 font-bold text-lg">Page</span>
         </header>
 
         {/* Content */}

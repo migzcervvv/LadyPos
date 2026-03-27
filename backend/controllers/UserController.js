@@ -103,27 +103,44 @@ export async function getUserById(req, res) {
 export async function updateUser(req, res) {
   try {
     const user = await User.findById(req.params.id);
-
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    // Only allow self-update or admin
     if (req.user.id !== user._id.toString() && req.user.role !== "admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Optional: prevent role escalation
-    if (req.body.role && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Cannot change role" });
+    // Update identifier if provided
+    if (req.body.identifier) user.identifier = req.body.identifier;
+
+    // Update password if provided (and hash it)
+    if (req.body.password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(req.body.password, salt);
     }
 
-    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    // Update confirmed field if provided
+    if (typeof req.body.confirmed === "boolean") {
+      user.confirmed = req.body.confirmed;
+    }
 
-    res.json(updatedUser);
+    // Only admin can change role
+    if (req.body.role && req.user.role === "admin") {
+      user.role = req.body.role;
+    }
+
+    await user.save(); // triggers pre-save hooks, including hashing
+    res.json({
+      id: user._id,
+      identifier: user.identifier,
+      role: user.role,
+      confirmed: user.confirmed,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 }
+
 // Delete user
 export async function deleteUser(req, res) {
   try {

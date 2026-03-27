@@ -6,6 +6,13 @@ export default function ProfilePage() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
+  const [editingIdentifier, setEditingIdentifier] = useState(false);
+  const [identifierValue, setIdentifierValue] = useState(user.identifier);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const url = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
@@ -16,7 +23,6 @@ export default function ProfilePage() {
         const res = await fetch(`${url}/users`, {
           headers: { Authorization: `Bearer ${jwt}` },
         });
-
         const data = await res.json();
         setUsers(data);
       } catch (err) {
@@ -39,55 +45,177 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (u) => {
     try {
-      await fetch(`${url}/users/${selectedUser._id}`, {
+      await fetch(`${url}/users/${u._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify({
-          identifier: selectedUser.identifier,
-          password: selectedUser.password,
-          confirmed: selectedUser.confirmed,
+          identifier: u.identifier,
+          password: u.password,
+          confirmed: u.confirmed,
         }),
       });
-
-      setUsers((prev) =>
-        prev.map((u) => (u._id === selectedUser._id ? selectedUser : u)),
-      );
+      setUsers((prev) => prev.map((user) => (user._id === u._id ? u : user)));
       setShowModal(false);
     } catch (err) {
       console.error("Update failed", err);
     }
   };
 
-  return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 capitalize">{user.identifier}</h1>
+  const handleIdentifierSave = async () => {
+    try {
+      await fetch(`${url}/users/${user._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ identifier: identifierValue }),
+      });
+      setEditingIdentifier(false);
+    } catch (err) {
+      console.error("Failed to update identifier:", err);
+    }
+  };
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white p-4 rounded shadow">
-          <p className="font-semibold">Identifier</p>
-          <p className="wrap-break-word">{user.identifier}</p>
+  const handlePasswordSave = async () => {
+    try {
+      await fetch(`${url}/users/${user._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ password: passwordValue }),
+      });
+      setPasswordValue("");
+      setShowPassword(false);
+      setEditingPassword(false);
+    } catch (err) {
+      console.error("Failed to update password:", err);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {/* User Details */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {/* Identifier Card */}
+        <div className="bg-[var(--color-surface)] p-4 rounded shadow flex flex-col md:flex-row items-start md:items-center justify-between">
+          <div className="flex-1">
+            <p className="font-semibold">Identifier</p>
+            {editingIdentifier ? (
+              <input
+                className="border rounded p-2 mt-1 w-full"
+                value={identifierValue}
+                onChange={(e) => setIdentifierValue(e.target.value)}
+              />
+            ) : (
+              <p className="break-words mt-1">{identifierValue}</p>
+            )}
+          </div>
+          <div className="flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 mt-2 md:mt-0">
+            {editingIdentifier ? (
+              <>
+                <button
+                  className="bg-[var(--color-primary)] text-white px-3 py-1 rounded hover:brightness-110 transition"
+                  onClick={handleIdentifierSave}
+                >
+                  Save
+                </button>
+                <button
+                  className="bg-[var(--color-muted)] px-3 py-1 rounded hover:brightness-90 transition"
+                  onClick={() => {
+                    setEditingIdentifier(false);
+                    setIdentifierValue(user.identifier);
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                className="bg-[var(--color-accent)] text-white px-3 py-1 rounded hover:brightness-110 transition"
+                onClick={() => setEditingIdentifier(true)}
+              >
+                Edit
+              </button>
+            )}
+          </div>
         </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="font-semibold">Password</p>
-          <p>{"•".repeat(8)}</p>
+
+        {/* Password Card */}
+        <div className="bg-[var(--color-surface)] p-4 rounded shadow flex flex-col md:flex-row items-start md:items-center justify-between">
+          <div className="flex-1">
+            <p className="font-semibold">Password</p>
+            {editingPassword ? (
+              <input
+                className="border rounded p-2 mt-1 w-full"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={passwordValue}
+                onChange={(e) => setPasswordValue(e.target.value)}
+              />
+            ) : (
+              <p className="mt-1">{"•".repeat(8)}</p>
+            )}
+          </div>
+          <div className="flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 mt-2 md:mt-0">
+            {editingPassword ? (
+              <>
+                <button
+                  className="px-2 bg-[var(--color-muted)] rounded hover:brightness-90 transition"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+                <button
+                  className="bg-[var(--color-primary)] text-white px-3 py-1 rounded hover:brightness-110 transition"
+                  onClick={handlePasswordSave}
+                  disabled={!passwordValue}
+                >
+                  Save
+                </button>
+                <button
+                  className="bg-[var(--color-muted)] px-3 py-1 rounded hover:brightness-90 transition"
+                  onClick={() => {
+                    setEditingPassword(false);
+                    setPasswordValue("");
+                    setShowPassword(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                className="bg-[var(--color-accent)] text-white px-3 py-1 rounded hover:brightness-110 transition"
+                onClick={() => setEditingPassword(true)}
+              >
+                Edit
+              </button>
+            )}
+          </div>
         </div>
-        <div className="bg-white p-4 rounded shadow">
+
+        {/* Role Card */}
+        <div className="bg-[var(--color-surface)] p-4 rounded shadow flex flex-col justify-between">
           <p className="font-semibold">Role</p>
-          <p>{user.role}</p>
+          <p className="mt-1">{user.role}</p>
         </div>
       </div>
 
+      {/* Admin Section */}
       {user.role === "admin" && (
-        <div>
+        <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">Users Management</h2>
           <div className="overflow-x-auto">
-            <table className="w-full border border-gray-200 rounded-lg text-left">
-              <thead className="bg-gray-100">
+            <table className="min-w-full border border-[var(--color-border)] rounded-lg text-left">
+              <thead className="bg-[var(--color-secondary)]">
                 <tr>
                   <th className="px-4 py-2">Identifier</th>
                   <th className="px-4 py-2">Role</th>
@@ -98,26 +226,34 @@ export default function ProfilePage() {
                 {users.map((u) => (
                   <tr
                     key={u._id}
-                    className="border-t border-gray-200 hover:bg-gray-50"
+                    className="border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]"
                   >
                     <td className="px-4 py-2 break-words">{u.identifier}</td>
                     <td className="px-4 py-2">{u.role}</td>
-                    <td className="px-4 py-2 space-x-2">
-                      <button
-                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setShowModal(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                        onClick={() => handleDelete(u._id)}
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-2 flex flex-wrap gap-2">
+                      {u._id === user._id ? (
+                        <span className="text-[var(--color-muted)]">
+                          Cannot edit/delete self
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            className="bg-[var(--color-accent)] text-white px-3 py-1 rounded hover:brightness-110 transition"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowModal(true);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="bg-red-500 text-white px-3 py-1 rounded hover:brightness-110 transition"
+                            onClick={() => handleDelete(u._id)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -127,9 +263,10 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* Modal */}
       {showModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl w-full max-w-sm shadow-lg">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--color-surface)] p-6 rounded-xl w-full max-w-sm shadow-lg">
             <h2 className="text-xl font-bold mb-4">Edit User</h2>
 
             <input
@@ -161,15 +298,15 @@ export default function ProfilePage() {
               <span>Confirmed</span>
             </label>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end flex-wrap gap-2">
               <button
-                className="bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600"
-                onClick={handleUpdate}
+                className="bg-[var(--color-primary)] text-white px-4 py-1 rounded hover:brightness-110 transition"
+                onClick={() => handleUpdate(selectedUser)}
               >
                 Save
               </button>
               <button
-                className="bg-gray-300 px-4 py-1 rounded hover:bg-gray-400"
+                className="bg-[var(--color-muted)] px-4 py-1 rounded hover:brightness-90 transition"
                 onClick={() => setShowModal(false)}
               >
                 Cancel
