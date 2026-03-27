@@ -1,28 +1,21 @@
 import jwt from "jsonwebtoken";
 
 export function protect(req, res, next) {
-  let token;
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
+  const authHeader = req.headers.authorization;
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded; // attach id + role to request
-      next();
-    } catch (err) {
-      console.error("JWT verification failed:", err.message);
-      return res.status(401).json({ message: "Not authorized" });
-    }
-  } else {
-    console.warn("No Bearer token found in Authorization header");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No token" });
   }
 
-  if (!token) {
-    console.warn("No token provided. Access denied.");
-    return res.status(401).json({ message: "No token" });
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { id: decoded.id || decoded._id, role: decoded.role };
+    next();
+  } catch (err) {
+    console.error("JWT verification failed:", err.message);
+    return res.status(401).json({ message: "Not authorized" });
   }
 }
 

@@ -5,6 +5,7 @@ import RegisterPage from "../features/auth/pages/RegisterPage.jsx";
 import Layout from "../shared/components/Layout.jsx";
 import DashboardGuard from "../shared/hooks/DashboardGuard.jsx";
 import ProfilePage from "../features/auth/pages/ProfilePage.jsx";
+import PersonsPage from "../features/people/pages/PersonPage.jsx";
 
 const router = createBrowserRouter([
   {
@@ -31,7 +32,7 @@ const router = createBrowserRouter([
           },
           {
             path: "/customers",
-            element: <div>Customers Page</div>,
+            element: <PersonsPage />,
           },
           {
             path: "/orders",
