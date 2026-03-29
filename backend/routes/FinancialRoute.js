@@ -1,11 +1,13 @@
-import { Router } from 'express';
-const router = Router();
-import { createFinancial, getFinancials, getFinancialById, updateFinancial, deleteFinancial } from '../controllers/FinancialController.js';
+import express from "express";
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  getFinancialDashboard,
+  getFinancialReport,
+} from "../controllers/FinancialController.js";
 
-router.post('/', createFinancial);
-router.get('/', getFinancials);
-router.get('/:id', getFinancialById);
-router.put('/:id', updateFinancial);
-router.delete('/:id', deleteFinancial);
+const router = express.Router();
+
+router.get("/dashboard", protect, getFinancialDashboard);
+router.get("/report", protect, getFinancialReport);
 
 export default router;

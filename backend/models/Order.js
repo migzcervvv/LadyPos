@@ -9,13 +9,24 @@ const orderProductSchema = new Schema({
 
 const orderSchema = new Schema({
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    personId: { type: Schema.Types.ObjectId, ref: 'Person', required: false },
     products: [orderProductSchema],
     total: { type: Number, required: true },
-    orderCompleted: { type: Boolean, default: false },
-    orderPaid: { type: Boolean, default: false },
+    paymentStatus: {
+        type: String,
+        enum: ["paid", "debt"],
+        default: "debt",
+    },
+    orderStatus: {
+        type: String,
+        enum: ["pending", "completed"],
+        default: "pending",
+    },
     date: { type: Date, default: Date.now },
     paymentMethod: { type: String, default: 'Cash' },
-    notes: { type: String }
+    notes: { type: String },
+    // Prevent double-processing ledger entries
+    ledgerRecorded: { type: Boolean, default: false }
 }, { timestamps: true });
 
 export default model('Order', orderSchema);

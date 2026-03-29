@@ -1,11 +1,25 @@
 import { Router } from 'express';
-const router = Router();
-import { createProduct, getProducts, getProductById, updateProduct, deleteProduct } from '../controllers/ProductController.js';
+import {
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct
+} from '../controllers/ProductController.js';
 
-router.post('/', createProduct);
-router.get('/', getProducts);
-router.get('/:id', getProductById);
-router.put('/:id', updateProduct);
-router.delete('/:id', deleteProduct);
+import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+
+const router = Router();
+
+router.use(protect);
+
+router.route('/')
+  .post(authorizeRoles('admin', 'user'), createProduct)
+  .get(authorizeRoles('admin', 'user'), getProducts);
+
+router.route('/:id')
+  .get(authorizeRoles('admin', 'user'), getProductById)
+  .put(authorizeRoles('admin', 'user'), updateProduct)
+  .delete(authorizeRoles('admin', 'user'), deleteProduct);
 
 export default router;

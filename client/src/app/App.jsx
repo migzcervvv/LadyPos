@@ -6,6 +6,10 @@ import Layout from "../shared/components/Layout.jsx";
 import DashboardGuard from "../shared/hooks/DashboardGuard.jsx";
 import ProfilePage from "../features/auth/pages/ProfilePage.jsx";
 import PersonsPage from "../features/people/pages/PersonPage.jsx";
+import ProductPage from "../features/products/pages/ProductPage.jsx";
+import POSPage from "../features/orders/pages/PosPage.jsx";
+import OrdersPage from "../features/orders/pages/OrdersPage.jsx";
+import FinancialPage from "../features/financials/pages/FinancialPage.jsx";
 
 const router = createBrowserRouter([
   {
@@ -36,15 +40,19 @@ const router = createBrowserRouter([
           },
           {
             path: "/orders",
-            element: <div>Orders Page</div>,
+            element: <OrdersPage />,
           },
           {
-            path: "/debts",
-            element: <div>Debts Page</div>,
+            path: "/pos",
+            element: <POSPage />,
+          },
+          {
+            path: "/products",
+            element: <ProductPage />,
           },
           {
             path: "/finances",
-            element: <div>Finances Page</div>,
+            element: <FinancialPage />,
           },
         ],
       },

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
 import { usePersonApi } from "../services/api";
+import { useEffect, useState } from "react";
 import PersonForm from "../components/PersonForm";
 import PersonCard from "../components/PersonCard";
 
 export default function PersonsPage() {
-    const { getPersons, createPerson } = usePersonApi();
+  const { getPersons, createPerson } = usePersonApi();
 
   const [persons, setPersons] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -31,52 +31,43 @@ export default function PersonsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 flex justify-between items-center">
-        <h1 className="text-lg font-semibold">Persons</h1>
+    <div className="min-h-screen bg-[var(--color-bg)]">
+      {/* HEADER */}
+      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-4 py-3 flex justify-between items-center">
+        <h1 className="text-lg font-semibold tracking-tight">Customers</h1>
 
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm"
+          className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-xl text-sm shadow active:scale-95 transition"
         >
           {showForm ? "Close" : "+ Add"}
         </button>
       </div>
 
-      {/* Form (collapsible) */}
+      {/* FORM */}
       {showForm && (
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 animate-fade-in">
           <PersonForm onSubmit={handleCreate} />
         </div>
       )}
 
-      {/* Content */}
-      <div className="px-3 py-4 space-y-3">
-        
-        {/* Loading */}
+      {/* CONTENT */}
+      <div className="px-4 py-4 space-y-4">
         {loading && (
           <p className="text-center text-gray-500 text-sm">
-            Loading persons...
+            Loading customers...
           </p>
         )}
 
-        {/* Empty State */}
         {!loading && persons.length === 0 && (
-          <div className="text-center text-gray-500 text-sm mt-10">
-            No persons yet.
+          <div className="text-center text-gray-400 text-sm mt-16">
+            No customers yet
           </div>
         )}
 
-        {/* List */}
         {!loading &&
           persons.map((p) => (
-            <PersonCard
-              key={p._id}
-              person={p}
-              refresh={fetchPersons}
-            />
+            <PersonCard key={p._id} person={p} refresh={fetchPersons} />
           ))}
       </div>
     </div>

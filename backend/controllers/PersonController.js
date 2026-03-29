@@ -1,5 +1,6 @@
 import Person from '../models/Person.js';
 import { formatPerson } from "../utils/formatPerson.js";
+import { addDebtToPerson } from "../utils/personService.js";
 
 //
 // CREATE PERSON
@@ -70,7 +71,6 @@ export async function updatePerson(req, res, next) {
       res.status(404);
       throw new Error("Person not found");
     }
-
     res.json(formatPerson(person));
   } catch (err) {
     next(err);
@@ -103,32 +103,12 @@ export async function deletePerson(req, res, next) {
 //
 export async function addDebt(req, res, next) {
   try {
-    const { amount, orderId, notes, paymentMethod } = req.body;
-
-    if (!amount || amount <= 0) {
-      res.status(400);
-      throw new Error("Amount must be greater than 0");
-    }
-
-    const person = await Person.findOne({
-      _id: req.params.id,
+    const person = await addDebtToPerson({
+      personId: req.params.id,
       userId: req.user.id,
+      ...req.body,
     });
 
-    if (!person) {
-      res.status(404);
-      throw new Error("Person not found");
-    }
-
-    person.debts.push({
-      type: "debt",
-      amount,
-      orderId,
-      notes,
-      paymentMethod: paymentMethod || "Cash",
-    });
-
-    await person.save();
     res.status(201).json(formatPerson(person));
   } catch (err) {
     next(err);

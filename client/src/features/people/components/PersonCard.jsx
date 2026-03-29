@@ -1,106 +1,131 @@
-import { useState } from "react";
-import DebtForm from "./DebtForm";
 import { usePersonApi } from "../services/api";
+import { useState } from "react";
+import DebtForm from "../components/DebtForm";
 
 export default function PersonCard({ person, refresh }) {
   const { addDebt, addPayment } = usePersonApi();
+
   const [showDebtForm, setShowDebtForm] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
-  const [accordionOpen, setAccordionOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const toggleForm = (payment = false) => {
-    setIsPayment(payment);
-    setShowDebtForm((prev) => !prev);
-  };
+  const balance =
+    person.transactions?.length > 0 ? person.transactions[0].balanceAfter : 0;
 
   const handleAdd = async (data) => {
-    try {
-      if (isPayment) {
-        await addPayment(person._id, data);
-      } else {
-        await addDebt(person._id, data);
-      }
-      refresh();
-      setShowDebtForm(false);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to add transaction");
+    if (isPayment) {
+      await addPayment(person._id, data);
+    } else {
+      await addDebt(person._id, data);
     }
+    refresh();
+    setShowDebtForm(false);
   };
 
-  // Compute balance dynamically (latest transaction)
-  const balance =
-    person.transactions?.length > 0
-      ? person.transactions[0].balanceAfter
-      : 0;
-
   return (
-    <div className="bg-white p-4 shadow rounded mb-4">
-      <div className="flex justify-between items-center">
+    <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+      {/* HEADER */}
+      <div className="flex justify-between items-start">
         <div>
-          <h2 className="font-bold">{person.name}</h2>
-          {person.contactInfo && <p className="text-sm">{person.contactInfo}</p>}
-          {person.notes && <p className="text-sm italic">{person.notes}</p>}
+          <h2 className="font-semibold text-base">{person.name}</h2>
+
+          {person.contactInfo && (
+            <p className="text-xs text-gray-500">{person.contactInfo}</p>
+          )}
+
+          {person.notes && (
+            <p className="text-xs italic text-gray-400">{person.notes}</p>
+          )}
         </div>
+
         <div className="text-right">
-          <p className="font-bold text-lg mb-2">
-            Balance: <span className={balance < 0 ? "text-red-500" : ""}>{balance}</span>
+          <p className="text-xs text-gray-400">Balance</p>
+          <p
+            className={`text-lg font-bold ${
+              balance < 0 ? "text-red-500" : "text-green-600"
+            }`}
+          >
+            ₱ {balance}
           </p>
-          <button
-            className="bg-green-500 text-white px-3 py-1 rounded mr-2"
-            onClick={() => toggleForm(false)}
-          >
-            Add Debt
-          </button>
-          <button
-            className="bg-blue-500 text-white px-3 py-1 rounded"
-            onClick={() => toggleForm(true)}
-          >
-            Add Payment
-          </button>
         </div>
       </div>
 
-      {showDebtForm && <DebtForm onSubmit={handleAdd} isPayment={isPayment} />}
-
-      <div className="mt-3 border-t pt-2">
+      {/* ACTION BUTTONS */}
+      <div className="flex gap-2">
         <button
-          className="w-full text-left font-semibold py-1"
-          onClick={() => setAccordionOpen((prev) => !prev)}
+          onClick={() => {
+            setIsPayment(false);
+            setShowDebtForm(!showDebtForm);
+          }}
+          className="flex-1 md:w-40 bg-green-500 text-white py-2 rounded-xl text-sm active:scale-95"
         >
-          Transactions {accordionOpen ? "▲" : "▼"}
+          + Debt
         </button>
 
-        {accordionOpen && (
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full text-sm table-auto border border-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-2 py-1 border">Type</th>
-                  <th className="px-2 py-1 border">Amount</th>
-                  <th className="px-2 py-1 border">Date</th>
-                  <th className="px-2 py-1 border">Balance</th>
-                  <th className="px-2 py-1 border">Order</th>
-                  <th className="px-2 py-1 border">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {person.transactions?.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
-                    <td className="px-2 py-1 border">{t.type}</td>
-                    <td className="px-2 py-1 border">{t.amount}</td>
-                    <td className="px-2 py-1 border">
+        <button
+          onClick={() => {
+            setIsPayment(true);
+            setShowDebtForm(!showDebtForm);
+          }}
+          className="flex-1 md:w-40 bg-blue-500 text-white py-2 rounded-xl text-sm active:scale-95"
+        >
+          + Payment
+        </button>
+      </div>
+
+      {/* FORM */}
+      {showDebtForm && <DebtForm onSubmit={handleAdd} isPayment={isPayment} />}
+
+      {/* TRANSACTIONS */}
+      {/* TRANSACTIONS */}
+      <div className="pt-2">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full text-left text-sm font-medium text-gray-600"
+        >
+          Transactions {open ? "▲" : "▼"}
+        </button>
+
+        {open && (
+          <div className="mt-2 p-2 rounded-2xl bg-gray-50 border space-y-2 max-h-64 overflow-y-auto">
+            {person.transactions?.map((t) => {
+              const isDebt = t.type?.toLowerCase() === "debt";
+
+              return (
+                <div
+                  key={t.id}
+                  className={`p-3 rounded-xl text-sm flex justify-between border
+              ${
+                isDebt
+                  ? "bg-red-50 border-red-100"
+                  : "bg-green-50 border-green-100"
+              }`}
+                >
+                  {/* LEFT */}
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      {t.type} • ₱{t.amount}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
                       {new Date(t.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-2 py-1 border">{t.balanceAfter}</td>
-                    <td className="px-2 py-1 border">
-                      {t.orderId || "-"}
-                    </td>
-                    <td className="px-2 py-1 border">{t.notes || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </p>
+
+                    {t.notes && (
+                      <p className="text-xs italic text-gray-500">{t.notes}</p>
+                    )}
+                  </div>
+
+                  {/* RIGHT */}
+                  <div className="text-right text-xs">
+                    <p className="text-gray-400">Balance</p>
+                    <p className="font-semibold text-gray-700">
+                      ₱{t.balanceAfter}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

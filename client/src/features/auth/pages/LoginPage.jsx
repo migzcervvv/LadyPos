@@ -8,6 +8,8 @@ function LoginPage() {
   const { login, isLoading, error } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -16,8 +18,10 @@ function LoginPage() {
       alert("Please enter both identifier and password");
       return;
     }
-    await login({ identifier, password });
-    navigate("/");
+    const success = await login({ identifier, password });
+    setShowPassword(false);
+
+    if (success) navigate("/");
   };
 
   return (
@@ -51,13 +55,25 @@ function LoginPage() {
           {/* Password */}
           <div>
             <label className="text-sm text-muted">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full mt-1 p-3 rounded-xl border border-default bg-surface text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-secondary)"
-            />
+
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full p-3 pr-12 rounded-xl border border-default bg-surface text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-secondary)"
+              />
+
+              {/* Eye Button */}
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition"
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           </div>
 
           {/* Remember Me */}

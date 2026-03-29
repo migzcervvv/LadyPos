@@ -40,3 +40,30 @@ const personSchema = new Schema({
 }, { timestamps: true });
 
 export default model('Person', personSchema);
+
+// services/personService.js
+import Person from '../models/Person.js';
+
+export async function addDebtToPerson({
+  personId,
+  userId,
+  amount,
+  orderId,
+  notes,
+  paymentMethod
+}) {
+  const person = await Person.findOne({ _id: personId, userId });
+
+  if (!person) throw new Error("Person not found");
+
+  person.debts.push({
+    type: "debt",
+    amount,
+    orderId,
+    notes,
+    paymentMethod: paymentMethod || "Cash",
+  });
+
+  await person.save();
+  return person;
+}

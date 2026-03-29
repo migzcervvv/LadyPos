@@ -14,8 +14,8 @@ export default function Layout({ children }) {
   const tabs = [
     { name: "Profile", path: "/profile" },
     { name: "Customers", path: "/customers" },
-    { name: "Orders", path: "/orders" },
-    { name: "Debts", path: "/debts" },
+    { name: "Orders", path: "/pos" },
+    { name: "Products", path: "/products" },
     { name: "Finances", path: "/finances" },
     { name: "Logout", path: "/logout" },
   ];
