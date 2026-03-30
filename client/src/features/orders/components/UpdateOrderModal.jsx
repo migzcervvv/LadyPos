@@ -225,10 +225,6 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
           <div className="flex flex-col gap-2">
             <button
               onClick={async () => {
-                if (!personId) {
-                  return alert("Select customer first");
-                }
-
                 await updateOrder(order._id, {
                   orderStatus: "completed",
                   paymentStatus: "paid",

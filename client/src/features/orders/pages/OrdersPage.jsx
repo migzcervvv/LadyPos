@@ -108,6 +108,12 @@ export default function OrdersPage() {
                   Customer: {order.personId?.name || "Walk-in"}
                 </p>
                 <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+                  Customer Type:{" "}
+                  <span className="font-medium capitalize">
+                    {order.customerType}
+                  </span>
+                </p>
+                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
                   {formatDateTime(order.createdAt)}
                 </p>
                 <p className="text-xs" style={{ color: "var(--color-muted)" }}>
