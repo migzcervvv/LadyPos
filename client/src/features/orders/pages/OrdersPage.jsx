@@ -27,7 +27,7 @@ export default function OrdersPage() {
 
   return (
     <div
-      className="min-h-screen p-3"
+      className="min-h-full p-3"
       style={{
         backgroundColor: "var(--color-bg)",
         color: "var(--color-text)",

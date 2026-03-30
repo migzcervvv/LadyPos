@@ -14,6 +14,7 @@ export function usePersonApi() {
 
   const getPersons = () => axiosInstance.get(API);
   const createPerson = (data) => axiosInstance.post(API, data);
+  const getPersonById = (id) => axiosInstance.get(`${API}/${id}`);
   const addDebt = (personId, debt) =>
     axiosInstance.post(`${API}/${personId}/debts`, debt);
   const addPayment = (personId, payment) =>
@@ -21,5 +22,12 @@ export function usePersonApi() {
   const payAllDebts = (personId) =>
     axiosInstance.post(`${API}/${personId}/pay-all`);
 
-  return { getPersons, createPerson, addDebt, addPayment, payAllDebts };
+  return {
+    getPersons,
+    createPerson,
+    addDebt,
+    addPayment,
+    payAllDebts,
+    getPersonById,
+  };
 }

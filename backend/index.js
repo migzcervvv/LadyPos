@@ -20,6 +20,8 @@ app.get("/", (req, res) => {
 
 const allowedOrigins = [
   "http://localhost:5173", // dev
+
+  "https://serveflow.netlify.app", // production
 ];
 
 app.use(

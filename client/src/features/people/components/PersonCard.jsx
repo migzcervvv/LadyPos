@@ -108,7 +108,14 @@ export default function PersonCard({ person, refresh }) {
                     </p>
 
                     <p className="text-xs text-gray-500">
-                      {new Date(t.date).toLocaleDateString()}
+                      {new Date(t.date).toLocaleString("en-US", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
                     </p>
 
                     {t.notes && (

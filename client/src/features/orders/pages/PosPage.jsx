@@ -78,7 +78,7 @@ export default function POSPage() {
 
   return (
     <div
-      className="min-h-screen flex"
+      className="min-h-full flex"
       style={{
         backgroundColor: "var(--color-bg)",
         color: "var(--color-text)",

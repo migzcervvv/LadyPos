@@ -3,9 +3,8 @@ import DayDetails from "./DayDetails.jsx";
 
 export default function BottomSheet({ view, onClose }) {
   if (!view) return null;
-
   return (
-    <div className="fixed inset-0 z-[9999]">
+    <div className="fixed inset-0 z-50">
       {/* BACKDROP */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
@@ -31,7 +30,7 @@ export default function BottomSheet({ view, onClose }) {
 
         {view.type === "day" && <DayDetails date={view.data} />}
 
-        {view.type === "debtor" && <DebtorDetails id={view.data.id} />}
+        {view.type === "debtor" && <DebtorDetails data={view.data} />}
       </div>
     </div>
   );
