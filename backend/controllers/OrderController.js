@@ -2,42 +2,67 @@ import Order from "../models/Order.js";
 import { addDebtToPerson, addPaymentToPerson } from "../utils/personService.js";
 
 // Create Order (Authenticated user only)
+import mongoose from "mongoose";
+
 export async function createOrder(req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { products, personId, paymentStatus } = req.body;
     const userId = req.user.id;
 
+    // ✅ Validation
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      throw new Error("Products are required");
+    }
+
+    // ✅ Safe total calculation
     const total = products.reduce((sum, p) => {
-      return sum + p.price * p.quantity;
+      const price = Number(p.price) || 0;
+      const qty = Number(p.quantity) || 0;
+      return sum + price * qty;
     }, 0);
 
-    let order = new Order({
+    if (total <= 0) {
+      throw new Error("Invalid total amount");
+    }
+
+    // ✅ Create order (not saved yet)
+    const order = new Order({
       userId,
       personId,
       products,
       total,
       paymentStatus,
-      orderStatus: "completed",
+      orderStatus: "pending",
+      ledgerRecorded: paymentStatus === "debt", // pre-set
     });
 
-    await order.save();
+    // ✅ Save order inside transaction
+    await order.save({ session });
 
-    // 🔥 AUTO SYNC DEBT
-    if (paymentStatus === "debt" && personId && !order.ledgerRecorded) {
+    // ✅ Handle debt safely
+    if (paymentStatus === "debt" && personId) {
       await addDebtToPerson({
         personId,
         userId,
         amount: total,
         orderId: order._id,
         notes: "Auto from order",
+        session, // 👈 pass session if your function supports it
       });
-
-      order.ledgerRecorded = true;
-      await order.save();
     }
+
+    // ✅ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
 
     res.json(order);
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error("Create Order Error:", err);
     res.status(500).json({ error: err.message });
   }
@@ -45,10 +70,10 @@ export async function createOrder(req, res) {
 // Get Orders (User = own orders, Admin = all)
 export async function getOrders(req, res) {
   try {
-    let filter = {};
-
-    const orders = await Order.find(filter).populate("products.productId");
-
+    const orders = await Order.find({})
+      .populate("products.productId")
+      .populate("personId", "name")
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -10,6 +10,24 @@ export default function OrdersPage() {
   const [tab, setTab] = useState("pending");
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  const formatDateTime = (date) => {
+    const d = new Date(date);
+    const now = new Date();
+
+    const isToday = d.toDateString() === now.toDateString();
+
+    return isToday
+      ? d.toLocaleTimeString("en-PH", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : d.toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+        });
+  };
+
   const fetchOrders = async () => {
     const res = await getOrders();
     setOrders(res.data);
@@ -83,13 +101,14 @@ export default function OrdersPage() {
             }}
           >
             <p className="font-bold">₱ {order.total}</p>
-
             <p className="text-sm">{order.products.length} items</p>
 
             <p className="text-sm">
               Customer: {order.personId?.name || "Walk-in"}
             </p>
-
+            <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+              {formatDateTime(order.createdAt)}
+            </p>
             <p className="text-xs" style={{ color: "var(--color-muted)" }}>
               {order.orderStatus}
             </p>
