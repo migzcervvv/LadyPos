@@ -11,6 +11,7 @@ export default function POSPage() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [products, setProducts] = useState([]);
   const [persons, setPersons] = useState([]);
+  const [customerType, setCustomerType] = useState("walkin");
 
   const [cart, setCart] = useState([]);
   const [personId, setPersonId] = useState("");
@@ -65,7 +66,7 @@ export default function POSPage() {
       await createOrder({
         products: cart,
         total,
-        personId: personId || null,
+        personId: customerType === "customer" ? personId : null,
       });
 
       // reset
@@ -147,18 +148,63 @@ export default function POSPage() {
             </button>
           </div>
           {/* CUSTOMER */}
-          <select
-            className="mb-4 p-2 border rounded"
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-          >
-            <option value="">Walk-in</option>
-            {persons.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* CUSTOMER TYPE */}
+          <div className="mb-3">
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {["walkin", "customer", "grab", "foodpanda"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setCustomerType(type);
+                    if (type !== "customer") setPersonId("");
+                  }}
+                  className={`py-2 rounded-lg text-sm font-medium transition ${
+                    customerType === type
+                      ? "text-white shadow"
+                      : "border hover:bg-[var(--color-secondary)]"
+                  }`}
+                  style={{
+                    backgroundColor:
+                      customerType === type
+                        ? "var(--color-primary)"
+                        : "transparent",
+                  }}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            {/* CONDITIONAL INPUT */}
+            {customerType === "customer" && (
+              <select
+                className="w-full p-2 border rounded"
+                value={personId}
+                onChange={(e) => setPersonId(e.target.value)}
+              >
+                <option value="">Select Customer</option>
+                {persons.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {customerType === "grab" && (
+              <input
+                placeholder="Grab reference (optional)"
+                className="w-full p-2 border rounded"
+              />
+            )}
+
+            {customerType === "foodpanda" && (
+              <input
+                placeholder="Foodpanda reference (optional)"
+                className="w-full p-2 border rounded"
+              />
+            )}
+          </div>
 
           {/* CART ITEMS */}
           <div

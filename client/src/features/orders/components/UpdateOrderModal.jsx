@@ -152,30 +152,6 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
             </select>
           </div>
 
-          {/* STATUS + PAYMENT */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <select
-              className="p-3 rounded-lg border"
-              value={orderStatus}
-              onChange={(e) => setOrderStatus(e.target.value)}
-            >
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-            </select>
-
-            <select
-              className="p-3 rounded-lg border"
-              value={paymentStatus}
-              onChange={(e) => setPaymentStatus(e.target.value)}
-            >
-              <option value="unpaid">Unpaid</option>
-              <option value="paid">Paid</option>
-              <option value="debt" disabled={!personId}>
-                Debt
-              </option>
-            </select>
-          </div>
-
           {/* ADD PRODUCTS */}
           <p className="text-sm font-semibold mb-1">Add Products</p>
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3">

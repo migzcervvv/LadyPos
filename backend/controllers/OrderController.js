@@ -70,16 +70,18 @@ export async function createOrder(req, res) {
 // Get Orders (User = own orders, Admin = all)
 export async function getOrders(req, res) {
   try {
-    const orders = await Order.find({})
+    const userId = req.user.id; // from auth middleware
+
+    const orders = await Order.find({ userId })
       .populate("products.productId")
       .populate("personId", "name")
       .sort({ createdAt: -1 });
+
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
-
 // Get Single Order
 export async function getOrderById(req, res) {
   try {
