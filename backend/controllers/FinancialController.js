@@ -2,105 +2,80 @@ import Financial from "../models/Financial.js";
 import Order from "../models/Order.js";
 import Person from "../models/Person.js";
 
-/**
- * 🔥 FINANCIAL DASHBOARD
- */
 export async function getFinancialDashboard(req, res) {
   try {
     const userId = req.user.id;
+    const days = Number(req.query.days) || 7;
 
-    // ✅ Get completed orders
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // =====================
+    // ORDERS
+    // =====================
     const orders = await Order.find({
       userId,
       orderStatus: "completed",
+      createdAt: { $gte: startDate },
     });
 
-    let grossIncome = 0;
-    let pendingReceivables = 0;
+    let revenue = 0;
+    let receivables = 0;
+    let paidOrders = 0;
 
     orders.forEach((o) => {
       if (o.paymentStatus === "paid") {
-        grossIncome += o.total;
-      } else if (o.paymentStatus === "debt") {
-        pendingReceivables += o.total;
+        revenue += o.total;
+        paidOrders += o.total;
+      } else {
+        receivables += o.total;
       }
     });
 
-    // ✅ Expenses
-    const financial = await Financial.findOne({ userId });
-    const expenses = financial?.expenses || [];
-
-    const totalExpenses = expenses.reduce(
-      (sum, e) => sum + Number(e.amount || 0),
-      0,
-    );
-
-    // ✅ Net income
-    const netIncome = grossIncome - totalExpenses;
-
-    // ✅ Debt (ledger-based)
+    // =====================
+    // PERSON (DEBT + PAYMENTS)
+    // =====================
     const persons = await Person.find({ userId });
 
     let totalDebt = 0;
+    let totalPayments = 0;
+    const debtorMap = [];
 
     persons.forEach((p) => {
+      let balance = 0;
+
       p.debts.forEach((d) => {
-        if (d.type === "debt") totalDebt += d.amount;
-        if (d.type === "payment") totalDebt -= d.amount;
+        if (d.type === "debt") {
+          totalDebt += d.amount;
+          balance += d.amount;
+        } else {
+          totalDebt -= d.amount;
+          totalPayments += d.amount;
+          balance -= d.amount;
+        }
       });
+
+      if (balance > 0) {
+        debtorMap.push({
+          id: p._id,
+          name: p.name,
+          balance,
+        });
+      }
     });
 
-    // ✅ ROI
-    const capital = financial?.capitalInvested || 0;
-    const roi = capital > 0 ? (netIncome / capital) * 100 : 0;
+    const topDebtors = debtorMap
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 5);
 
-    res.json({
-      grossIncome,
-      pendingReceivables,
-      totalExpenses,
-      netIncome,
-      totalDebt,
-      capital,
-      roi,
-      totalOrders: orders.length,
-    });
-  } catch (err) {
-    console.error("Financial Dashboard Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * 📊 FINANCIAL REPORT (DATE FILTER + DAILY)
- */
-export async function getFinancialReport(req, res) {
-  try {
-    const userId = req.user.id;
-    const { from, to } = req.query;
-
-    const start = new Date(from);
-    const end = new Date(to);
-
-    const orders = await Order.find({
-      userId,
-      orderStatus: "completed",
-      createdAt: { $gte: start, $lte: end },
-    });
-
-    let gross = 0;
-    let receivables = 0;
-
-    orders.forEach((o) => {
-      if (o.paymentStatus === "paid") gross += o.total;
-      if (o.paymentStatus === "debt") receivables += o.total;
-    });
-
-    // Expenses
+    // =====================
+    // EXPENSES
+    // =====================
     const financial = await Financial.findOne({ userId });
 
     const expenses = (financial?.expenses || []).filter((e) => {
       const d = new Date(e.date);
-      return d >= start && d <= end;
+      return d >= startDate;
     });
 
     const totalExpenses = expenses.reduce(
@@ -108,142 +83,97 @@ export async function getFinancialReport(req, res) {
       0,
     );
 
-    const net = gross - totalExpenses;
+    // =====================
+    // CASH FLOW
+    // =====================
+    const cashIn = paidOrders + totalPayments;
+    const cashOut = totalExpenses;
+    const netCashFlow = cashIn - cashOut;
 
-    // Debt ledger
-    const persons = await Person.find({ userId });
+    const netProfit = revenue - totalExpenses;
 
-    let totalDebt = 0;
-
-    persons.forEach((p) => {
-      p.debts.forEach((d) => {
-        if (d.type === "debt") totalDebt += d.amount;
-        if (d.type === "payment") totalDebt -= d.amount;
-      });
-    });
-
-    // Daily breakdown
+    // =====================
+    // DAILY MAP
+    // =====================
     const dailyMap = {};
 
     orders.forEach((o) => {
       const day = new Date(o.createdAt).toISOString().split("T")[0];
 
       if (!dailyMap[day]) {
-        dailyMap[day] = { gross: 0, receivables: 0 };
+        dailyMap[day] = {
+          date: day,
+          revenue: 0,
+          receivables: 0,
+          orders: 0,
+        };
       }
 
+      dailyMap[day].orders += 1;
+
       if (o.paymentStatus === "paid") {
-        dailyMap[day].gross += o.total;
+        dailyMap[day].revenue += o.total;
       } else {
         dailyMap[day].receivables += o.total;
       }
     });
 
-    const daily = Object.entries(dailyMap).map(([date, val]) => ({
-      date,
-      ...val,
-    }));
+    const daily = Object.values(dailyMap);
 
     res.json({
-      summary: {
-        gross,
+      kpis: {
+        revenue,
         receivables,
-        totalExpenses,
-        net,
-        totalOrders: orders.length,
         totalDebt,
+        totalExpenses,
+        netProfit,
+        cashIn,
+        cashOut,
+        netCashFlow,
       },
       daily,
+      topDebtors,
     });
   } catch (err) {
-    console.error("Financial Report Error:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 }
 
-/**
- * ➕ ADD EXPENSE
- */
-export async function addExpense(req, res) {
-  try {
-    const { type, amount } = req.body;
-    const userId = req.user.id;
-
-    if (!type || !amount || amount <= 0) {
-      return res.status(400).json({
-        error: "Type and valid amount required",
-      });
-    }
-
-    let financial = await Financial.findOne({ userId });
-
-    if (!financial) {
-      financial = new Financial({ userId, expenses: [] });
-    }
-
-    financial.expenses.push({
-      type,
-      amount,
-      date: new Date(),
-    });
-
-    await financial.save();
-
-    res.json(financial);
-  } catch (err) {
-    console.error("Add Expense Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * ❌ DELETE EXPENSE
- */
-export async function deleteExpense(req, res) {
+export async function getDebtorDetails(req, res) {
   try {
     const userId = req.user.id;
-    const { expenseId } = req.params;
+    const { id } = req.params;
 
-    const financial = await Financial.findOne({ userId });
+    const person = await Person.findOne({ _id: id, userId });
 
-    if (!financial) {
+    if (!person) {
       return res.status(404).json({ error: "Not found" });
     }
 
-    financial.expenses = financial.expenses.filter(
-      (e) => e._id.toString() !== expenseId,
-    );
-
-    await financial.save();
-
-    res.json({ message: "Expense deleted" });
+    res.json(person.debts);
   } catch (err) {
-    console.error("Delete Expense Error:", err);
     res.status(500).json({ error: err.message });
   }
 }
 
-/**
- * ✏️ UPDATE CAPITAL
- */
-export async function updateCapital(req, res) {
+export async function getDayDetails(req, res) {
   try {
     const userId = req.user.id;
-    const { capitalInvested } = req.body;
+    const { date } = req.params;
 
-    let financial = await Financial.findOne({ userId });
+    const start = new Date(date);
+    const end = new Date(date);
+    end.setDate(end.getDate() + 1);
 
-    if (!financial) {
-      financial = new Financial({ userId });
-    }
+    const orders = await Order.find({
+      userId,
+      orderStatus: "completed",
+      createdAt: { $gte: start, $lt: end },
+    }).populate("personId", "name");
 
-    financial.capitalInvested = capitalInvested || 0;
-
-    await financial.save();
-
-    res.json(financial);
+    res.json(orders);
   } catch (err) {
-    console.error("Update Capital Error:", err);
     res.status(500).json({ error: err.message });
   }
 }
