@@ -79,14 +79,14 @@ export default function POSPage() {
   return (
     <>
       <div
-        className="min-h-full flex"
+        className="h-screen flex flex-col md:flex-row overflow-hidden"
         style={{
           backgroundColor: "var(--color-bg)",
           color: "var(--color-text)",
         }}
       >
         {/* LEFT: PRODUCTS */}
-        <div className="w-2/3 p-4">
+        <div className="flex-1 md:w-2/3 p-3 md:p-4 overflow-y-auto">
           <h2 className="text-xl font-bold mb-4">Products</h2>
           <button
             onClick={() => navigate("/orders")}
@@ -117,21 +117,33 @@ export default function POSPage() {
 
         {/* RIGHT: CART */}
         <div
-          className="w-1/3 p-4 flex flex-col"
+          className="h-[45%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-hidden"
           style={{
             borderLeft: "1px solid var(--color-border)",
             backgroundColor: "var(--color-surface)",
           }}
         >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Cart</h2>
+          <div className="mb-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-bold">Cart</h2>
 
+              {/* Desktop button */}
+              <button
+                onClick={() => setShowAddPerson(true)}
+                className="hidden md:block px-3 py-1 rounded text-sm"
+                style={{ backgroundColor: "var(--color-secondary)" }}
+              >
+                + Add
+              </button>
+            </div>
+
+            {/* Mobile FULL WIDTH button */}
             <button
               onClick={() => setShowAddPerson(true)}
-              className="px-3 py-1 rounded text-sm"
+              className="w-full py-2 rounded md:hidden"
               style={{ backgroundColor: "var(--color-secondary)" }}
             >
-              + Add Person
+              + Add Customer
             </button>
           </div>
           {/* CUSTOMER */}
@@ -222,30 +234,41 @@ function AddPersonModal({ onClose, onCreated }) {
     if (!name.trim()) return;
 
     const res = await createPerson({ name });
-
-    onCreated(res.data); // pass back new person
+    onCreated(res.data);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50">
-      <div className="bg-white p-4 rounded w-80">
-        <h3 className="text-lg font-bold mb-3">Add Customer</h3>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
+      <div
+        className="w-full md:max-w-sm rounded-t-2xl md:rounded-xl p-4 animate-slideUp"
+        style={{
+          backgroundColor: "var(--color-surface)",
+        }}
+      >
+        {/* HANDLE (mobile UX detail) */}
+        <div className="w-10 h-1 bg-gray-400 rounded mx-auto mb-3 md:hidden"></div>
+
+        <h3 className="text-lg font-semibold mb-3">New Customer</h3>
 
         <input
-          className="w-full border p-2 mb-3"
-          placeholder="Customer Name"
+          className="w-full p-3 rounded-lg border mb-4"
+          placeholder="Enter name..."
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose}>Cancel</button>
+        <div className="flex flex-col gap-2">
           <button
             onClick={handleSubmit}
-            className="px-3 py-1 bg-blue-500 text-white rounded"
+            className="w-full py-3 rounded text-white"
+            style={{ backgroundColor: "var(--color-primary)" }}
           >
-            Save
+            Save Customer
+          </button>
+
+          <button onClick={onClose} className="w-full py-2 rounded border">
+            Cancel
           </button>
         </div>
       </div>
