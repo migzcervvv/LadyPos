@@ -1,19 +1,22 @@
-import axios from "axios";
-import { useAuth } from "../../../shared/hooks/AuthContext.jsx";
+import { useApi } from "../../../shared/utils/useApi";
 
-const API = import.meta.env.VITE_API_URL + "/invoices";
+export function useInvoiceApi() {
+  const api = useApi();
 
-export const useInvoiceApi = () => {
-  const { jwt } = useAuth();
+  const getInvoices = async (params = {}) => {
+    const res = await api.get("/invoices", { params });
+    return res;
+  };
 
-  const axiosInstance = axios.create({
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-  });
-  const getInvoices = (params) => axiosInstance.get(API, { params });
+  const ensureInvoice = async (orderId) => {
+    if (!orderId) throw new Error("orderId is required");
 
-  const ensureInvoice = (orderId) =>
-    axiosInstance.get(`${API}/order/${orderId}/ensure`);
-  return { getInvoices, ensureInvoice };
-};
+    const res = await api.get(`/invoices/order/${orderId}/ensure`);
+    return res;
+  };
+
+  return {
+    getInvoices,
+    ensureInvoice,
+  };
+}

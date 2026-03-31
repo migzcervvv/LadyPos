@@ -1,4 +1,4 @@
-import Person from '../models/Person.js';
+import Person from "../models/Person.js";
 import { formatPerson } from "../utils/formatPerson.js";
 import { addDebtToPerson } from "../utils/personService.js";
 
@@ -6,7 +6,6 @@ import { addDebtToPerson } from "../utils/personService.js";
 // CREATE PERSON
 //
 export async function createPerson(req, res, next) {
-  console.log("REQ.USER:", req.body); // <-- add this
   try {
     const person = await Person.create({
       ...req.body,
@@ -64,7 +63,7 @@ export async function updatePerson(req, res, next) {
     const person = await Person.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       { name, contactInfo, notes },
-      { new: true }
+      { new: true },
     );
 
     if (!person) {

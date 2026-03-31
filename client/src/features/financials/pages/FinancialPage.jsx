@@ -69,7 +69,6 @@ export default function FinancialPage() {
       {summary && (
         <>
           <p className="text-xs text-gray-500">{summary.rangeLabel}</p>
-
           <div className="grid grid-cols-3 gap-2">
             <div className="p-3 bg-green-100 rounded">
               ₱ {summary.total.gross.toFixed(2)}

@@ -1,67 +1,91 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { useAuth } from "../../../shared/hooks/AuthContext";
+import { useExpenseApi } from "../services/expenseApi";
 
 export default function ExpensePage() {
-  const { jwt } = useAuth();
-
-  const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
-    headers: { Authorization: `Bearer ${jwt}` },
-  });
-
+  const { getExpenses, createExpense, deleteExpense, updateExpense } =
+    useExpenseApi();
+  const [date, setDate] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("misc");
   const [note, setNote] = useState("");
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  // ✅ LOAD ONCE
+  const [editingId, setEditingId] = useState(null);
   useEffect(() => {
     loadExpenses();
   }, []);
-
+  const startEdit = (expense) => {
+    setEditingId(expense._id);
+    setAmount(expense.amount);
+    setCategory(expense.category);
+    setNote(expense.note || "");
+    setDate(expense.date ? expense.date.substring(0, 10) : "");
+  };
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/expenses");
-      setExpenses(res.data);
+      const data = await getExpenses();
+      setExpenses(data);
     } catch (err) {
-      console.error(err);
+      console.error("Load expenses failed:", err);
     } finally {
       setLoading(false);
     }
   };
+  const handleUpdate = async (e) => {
+    e.preventDefault();
 
-  // 🔥 ADD
+    if (!editingId) return;
+
+    try {
+      await updateExpense(editingId, {
+        amount,
+        category,
+        note,
+        date,
+      });
+
+      resetForm();
+      loadExpenses();
+    } catch (err) {
+      console.error("Update failed:", err);
+    }
+  };
+  const resetForm = () => {
+    setAmount("");
+    setCategory("misc");
+    setNote("");
+    setDate("");
+    setEditingId(null);
+  };
   const addExpense = async (e) => {
     e.preventDefault();
 
     if (!amount || amount <= 0) return;
 
     try {
-      await api.post("/expenses", {
+      await createExpense({
         amount,
         category,
         note,
+        date: date || undefined, // 👈 important
       });
 
       setAmount("");
       setNote("");
-
+      setDate("");
       loadExpenses();
     } catch (err) {
-      console.error(err);
+      console.error("Add expense failed:", err);
     }
   };
 
-  // 🔥 DELETE
-  const deleteExpense = async (id) => {
+  const handleDelete = async (id) => {
     try {
-      await api.delete(`/expenses/${id}`);
+      await deleteExpense(id);
       loadExpenses();
     } catch (err) {
-      console.error(err);
+      console.error("Delete failed:", err);
     }
   };
 
@@ -69,11 +93,13 @@ export default function ExpensePage() {
     <div className="p-4 space-y-4">
       <h1 className="text-xl font-bold">Expenses</h1>
 
-      {/* 🔥 ADD EXPENSE */}
       <div>
         <h2 className="font-semibold mb-2">Add Expense</h2>
 
-        <form onSubmit={addExpense} className="flex gap-2 flex-wrap">
+        <form
+          onSubmit={editingId ? handleUpdate : addExpense}
+          className="flex gap-2 flex-wrap"
+        >
           <input
             type="number"
             placeholder="Amount"
@@ -81,7 +107,6 @@ export default function ExpensePage() {
             onChange={(e) => setAmount(e.target.value)}
             className="border p-2 rounded"
           />
-
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -92,7 +117,12 @@ export default function ExpensePage() {
             <option value="utilities">Utilities</option>
             <option value="misc">Misc</option>
           </select>
-
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="border p-2 rounded"
+          />
           <input
             type="text"
             placeholder="Note"
@@ -100,12 +130,12 @@ export default function ExpensePage() {
             onChange={(e) => setNote(e.target.value)}
             className="border p-2 rounded"
           />
-
-          <button className="bg-black text-white px-3 rounded">Add</button>
+          <button className="bg-black text-white px-3 rounded">
+            {editingId ? "Update" : "Add"}
+          </button>{" "}
         </form>
       </div>
 
-      {/* 🔥 LIST */}
       <div>
         <h2 className="font-semibold mb-2">Expenses</h2>
 
@@ -127,12 +157,18 @@ export default function ExpensePage() {
                 <p className="text-xs text-gray-500">{e.note}</p>
               </div>
 
-              <button
-                onClick={() => deleteExpense(e._id)}
-                className="text-red-500"
-              >
-                Delete
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => startEdit(e)} className="text-blue-500">
+                  Edit
+                </button>
+
+                <button
+                  onClick={() => handleDelete(e._id)}
+                  className="text-red-500"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

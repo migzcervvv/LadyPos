@@ -10,7 +10,7 @@ const UserSchema = new Schema(
       default: "user",
     },
     name: { type: String },
-    phone: { type: String, unique: true },
+    phone: { type: String, unique: true, sparse: true },
     address: { type: String },
     confirmed: { type: Boolean, default: false },
   },

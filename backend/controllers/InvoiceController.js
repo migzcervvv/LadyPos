@@ -28,10 +28,13 @@ export const createInvoiceFromOrder = async (orderId) => {
   const tax = 0;
   const total = subtotal + tax;
 
-  const count = await Invoice.countDocuments();
+  const count = await Invoice.countDocuments({
+    userId: order.userId,
+  });
   const invoiceNumber = await generateInvoiceNumber(count);
 
   const invoice = new Invoice({
+    userId: order.userId,
     invoiceNumber,
     orderId,
     customer: order.customer,
@@ -62,7 +65,10 @@ export const getInvoices = async (req, res) => {
       if (to) filter.issuedAt.$lte = new Date(to);
     }
 
-    const invoices = await Invoice.find(filter)
+    const invoices = await Invoice.find({
+      userId: req.user.id,
+      ...filter,
+    })
       .sort({ issuedAt: -1 })
       .limit(100);
 

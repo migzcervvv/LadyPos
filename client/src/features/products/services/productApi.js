@@ -1,25 +1,37 @@
-import axios from "axios";
-import { useAuth } from "../../../shared/hooks/AuthContext.jsx";
-
-const API = import.meta.env.VITE_API_URL + "/products";
+import { useApi } from "../../../shared/utils/useApi";
 
 export function useProductApi() {
-  const { jwt } = useAuth();
+  const api = useApi();
+  const getProducts = async () => {
+    const res = await api.get("/products");
+    return res;
+  };
 
-  const axiosInstance = axios.create({
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-  });
+  const createProduct = async (data) => {
+    const res = await api.post("/products", data);
+    return res;
+  };
 
-  const getProducts = () => axiosInstance.get(API);
-  const createProduct = (data) => axiosInstance.post(API, data);
-  const getProductById = (personId, debt) =>
-    axiosInstance.get(`${API}/${personId}`, debt);
-  const updateProduct = (personId, payment) =>
-    axiosInstance.put(`${API}/${personId}`, payment);
-  const deleteProduct = (personId) =>
-    axiosInstance.delete(`${API}/${personId}`);
+  const getProductById = async (id) => {
+    const res = await api.get(`/products/${id}`);
+    return res;
+  };
 
-  return { getProducts, createProduct, getProductById, updateProduct, deleteProduct };
+  const updateProduct = async (id, data) => {
+    const res = await api.put(`/products/${id}`, data);
+    return res;
+  };
+
+  const deleteProduct = async (id) => {
+    const res = await api.delete(`/products/${id}`);
+    return res;
+  };
+
+  return {
+    getProducts,
+    createProduct,
+    getProductById,
+    updateProduct,
+    deleteProduct,
+  };
 }

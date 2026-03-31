@@ -1,17 +1,19 @@
 import mongoose from "mongoose";
+import { Schema as _Schema, model } from "mongoose";
+const Schema = _Schema;
 
-const invoiceItemSchema = new mongoose.Schema({
+const invoiceItemSchema = new Schema({
   productName: String,
   quantity: Number,
   price: Number,
   total: Number,
 });
 
-const invoiceSchema = new mongoose.Schema({
+const invoiceSchema = new Schema({
   invoiceNumber: { type: String, unique: true },
+  userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
 
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
-
+  orderId: { type: Schema.Types.ObjectId, ref: "Order" },
   customer: {
     name: String,
     phone: String,

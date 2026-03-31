@@ -103,9 +103,10 @@ export async function getOrders(req, res) {
 // Get Single Order
 export async function getOrderById(req, res) {
   try {
-    const order = await Order.findById(req.params.id).populate(
-      "products.productId",
-    );
+    const order = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    }).populate("products.productId");
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
@@ -255,7 +256,10 @@ export async function markAsCompleted(req, res) {
 // Delete Order
 export async function deleteOrder(req, res) {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });

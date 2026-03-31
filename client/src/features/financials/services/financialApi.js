@@ -1,36 +1,30 @@
-// services/financialApi.js
-import axios from "axios";
-import { useAuth } from "../../../shared/hooks/AuthContext.jsx";
-import { useMemo } from "react";
-
-const API_URL = import.meta.env.VITE_API_URL + "/financials";
+import { useApi } from "../../../shared/utils/useApi";
 
 export function useFinancialApi() {
-  const { jwt } = useAuth();
+  const api = useApi();
 
-  const axiosInstance = useMemo(() => {
-    return axios.create({
-      baseURL: import.meta.env.VITE_API_URL,
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-      },
+  const getSummary = async (range = "daily") => {
+    const res = await api.get(`/financials/summary`, {
+      params: { range },
     });
-  }, [jwt]);
-
-  const getSummary = async (range) => {
-    const res = await axiosInstance.get(`${API_URL}/summary?range=${range}`);
     return res.data;
   };
 
   const getDashboard = async () => {
-    const res = await axiosInstance.get(`${API_URL}/dashboard`);
-    return res.data;
+    const res = await api.get(`/financials/dashboard`);
+    return res;
   };
 
   const getDayDetails = async (date) => {
-    const res = await axiosInstance.get(`${API_URL}/day/${date}`);
-    return res.data;
+    if (!date) throw new Error("date is required");
+
+    const res = await api.get(`/financials/day/${date}`);
+    return res;
   };
 
-  return { getSummary, getDashboard, getDayDetails };
+  return {
+    getSummary,
+    getDashboard,
+    getDayDetails,
+  };
 }

@@ -10,6 +10,7 @@ export const createExpense = async (req, res) => {
     }
 
     const expense = new Expense({
+      userId: req.user.id, // ✅ REQUIRED
       amount,
       category,
       note,
@@ -99,7 +100,10 @@ export const getExpenses = async (req, res) => {
       if (to) filter.date.$lte = new Date(to);
     }
 
-    const expenses = await Expense.find(filter).sort({ date: -1 });
+    const expenses = await Expense.find({
+      userId: req.user.id,
+      ...filter,
+    }).sort({ date: -1 });
 
     res.json(expenses);
   } catch (err) {

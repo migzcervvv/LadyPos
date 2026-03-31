@@ -34,6 +34,7 @@ export async function createUser(req, res) {
       confirmed: user.confirmed,
     });
   } catch (err) {
+    console.error("Registration error:", err);
     res.status(500).json({ error: err.message });
   }
 }

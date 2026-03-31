@@ -1,26 +1,52 @@
-import axios from "axios";
-import { useAuth } from "../../../shared/hooks/AuthContext.jsx";
+import { useApi } from "../../../shared/utils/useApi";
 
-const API = import.meta.env.VITE_API_URL + "/orders";
 export function useOrderApi() {
-  const { jwt } = useAuth();
+  const api = useApi();
 
-  const axiosInstance = axios.create({
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-  });
+  const getOrders = async () => {
+    const res = await api.get("/orders");
+    return res;
+  };
 
-const getOrders = () => axiosInstance.get(API);
-const createOrder = (data) => axiosInstance.post(API, data);
-const getOrderById = (orderId) => axiosInstance.get(`${API}/${orderId}`);
-const updateOrder = (orderId, data) => axiosInstance.put(`${API}/${orderId}`, data);
-const deleteOrder = (orderId) => axiosInstance.delete(`${API}/${orderId}`);
-const markOrderPaid = (orderId) => axiosInstance.patch(`${API}/${orderId}/pay`);
-const markOrderCompleted = (orderId) => axiosInstance.patch(`${API}/${orderId}/complete`);
+  const getOrderById = async (orderId) => {
+    if (!orderId) throw new Error("orderId is required");
 
-  return { getOrders, createOrder, 
-    getOrderById, updateOrder, 
-    deleteOrder, markOrderPaid, 
-    markOrderCompleted };
+    const res = await api.get(`/orders/${orderId}`);
+    return res;
+  };
+
+  const createOrder = async (data) => {
+    const res = await api.post("/orders", data);
+    return res;
+  };
+
+  const updateOrder = async (orderId, data) => {
+    const res = await api.put(`/orders/${orderId}`, data);
+    return res;
+  };
+
+  const deleteOrder = async (orderId) => {
+    const res = await api.delete(`/orders/${orderId}`);
+    return res;
+  };
+
+  const markOrderPaid = async (orderId) => {
+    const res = await api.patch(`/orders/${orderId}/pay`);
+    return res;
+  };
+
+  const markOrderCompleted = async (orderId) => {
+    const res = await api.patch(`/orders/${orderId}/complete`);
+    return res;
+  };
+
+  return {
+    getOrders,
+    getOrderById,
+    createOrder,
+    updateOrder,
+    deleteOrder,
+    markOrderPaid,
+    markOrderCompleted,
+  };
 }
