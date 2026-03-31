@@ -9,6 +9,10 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("pending");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("today");
+  const [search, setSearch] = useState("");
 
   const formatDateTime = (date) => {
     const d = new Date(date);
@@ -37,11 +41,46 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
-  const filtered = orders.filter((o) =>
-    tab === "pending"
-      ? o.orderStatus !== "completed"
-      : o.orderStatus === "completed",
-  );
+  const filtered = orders.filter((o) => {
+    // TAB (existing)
+    const matchesTab =
+      tab === "pending"
+        ? o.orderStatus !== "completed"
+        : o.orderStatus === "completed";
+
+    // CUSTOMER TYPE
+    const matchesType = typeFilter === "all" || o.customerType === typeFilter;
+
+    // PAYMENT
+    const matchesPayment =
+      paymentFilter === "all" || o.paymentStatus === paymentFilter;
+
+    // DATE
+    const now = new Date();
+    const orderDate = new Date(o.createdAt);
+
+    let matchesDate = true;
+    if (dateFilter === "today") {
+      matchesDate = orderDate.toDateString() === now.toDateString();
+    } else if (dateFilter === "7days") {
+      const diff = (now - orderDate) / (1000 * 60 * 60 * 24);
+      matchesDate = diff <= 7;
+    }
+
+    // SEARCH (name or reference)
+    const matchesSearch =
+      !search ||
+      o.personId?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      o.reference?.toLowerCase().includes(search.toLowerCase());
+
+    return (
+      matchesTab &&
+      matchesType &&
+      matchesPayment &&
+      matchesDate &&
+      matchesSearch
+    );
+  });
 
   return (
     <div
@@ -89,6 +128,51 @@ export default function OrdersPage() {
           </button>
         </div>
         <div className="flex-1 overflow-y-scroll pr-1 pb-20">
+          {/* FILTERS */}
+          <div className="flex flex-col gap-2 mb-3">
+            {/* SEARCH */}
+            <input
+              placeholder="Search customer / reference..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="p-2 rounded border"
+            />
+
+            {/* ROW 1 */}
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="p-2 rounded border"
+              >
+                <option value="all">All Types</option>
+                <option value="walkin">Walk-in</option>
+                <option value="customer">Customer</option>
+                <option value="grab">Grab</option>
+                <option value="foodpanda">Foodpanda</option>
+              </select>
+
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="p-2 rounded border"
+              >
+                <option value="all">All Payments</option>
+                <option value="paid">Paid</option>
+                <option value="debt">Debt</option>
+              </select>
+
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="p-2 rounded border"
+              >
+                <option value="today">Today</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
           {/* ORDER LIST */}
           <div className="flex flex-col gap-3">
             {filtered.map((order) => (
@@ -98,7 +182,13 @@ export default function OrdersPage() {
                 className="p-4 rounded-xl shadow cursor-pointer"
                 style={{
                   backgroundColor: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                  border: `1px solid ${
+                    order.paymentStatus === "debt"
+                      ? "red"
+                      : order.customerType === "grab"
+                        ? "green"
+                        : "var(--color-border)"
+                  }`,
                 }}
               >
                 <p className="font-bold">₱ {order.total}</p>
@@ -107,17 +197,23 @@ export default function OrdersPage() {
                 <p className="text-sm">
                   Customer: {order.personId?.name || "Walk-in"}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-                  Customer Type:{" "}
-                  <span className="font-medium capitalize">
-                    {order.customerType}
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  <span className="text-xs px-2 py-1 rounded bg-gray-200">
+                    {order.customerType} {order.reference || ""}
                   </span>
-                </p>
+
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      order.paymentStatus === "debt"
+                        ? "bg-red-200"
+                        : "bg-green-200"
+                    }`}
+                  >
+                    {order.orderStatus} - {order.paymentStatus}
+                  </span>
+                </div>
                 <p className="text-xs" style={{ color: "var(--color-muted)" }}>
                   {formatDateTime(order.createdAt)}
-                </p>
-                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-                  {order.orderStatus}
                 </p>
               </div>
             ))}

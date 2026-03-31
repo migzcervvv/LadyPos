@@ -2,30 +2,33 @@ import { useEffect, useState } from "react";
 import { useProductApi } from "../../products/services/productApi";
 import { usePersonApi } from "../../people/services/api";
 import { useOrderApi } from "../services/ordersApi";
+import { useInvoiceApi } from "../../invoices/services/invoiceApi";
+import Invoice from "../../invoices/components/Invoice";
+import { useAuth } from "../../../shared/hooks/AuthContext";
 
 export default function UpdateOrderModal({ order, onClose, onSuccess }) {
   const { getProducts } = useProductApi();
   const { getPersons } = usePersonApi();
   const { updateOrder } = useOrderApi();
+  const { ensureInvoice } = useInvoiceApi();
+  const { user } = useAuth();
 
   const [products, setProducts] = useState([]);
   const [persons, setPersons] = useState([]);
-
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [personId, setPersonId] = useState("");
+  const [invoice, setInvoice] = useState(null);
 
-  const [orderStatus, setOrderStatus] = useState("pending");
-  const [paymentStatus, setPaymentStatus] = useState("unpaid");
+  const isAdmin = user?.role === "admin";
+  const isCompleted = order?.orderStatus?.toLowerCase() === "completed";
 
-  // LOAD
+  // 🔹 LOAD DATA
   useEffect(() => {
     getProducts().then((res) => setProducts(res.data));
     getPersons().then((res) => setPersons(res.data));
 
     if (order) {
       setPersonId(order.personId?._id || order.personId || "");
-      setOrderStatus(order.orderStatus);
-      setPaymentStatus(order.paymentStatus);
 
       const mapped = order.products.map((p) => ({
         productId:
@@ -44,13 +47,17 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
   }, [order]);
 
   useEffect(() => {
-    if (orderStatus === "completed" && paymentStatus === "unpaid") {
-      setPaymentStatus("paid"); // default
+    if (invoice) {
+      setTimeout(() => {
+        window.print();
+      }, 100);
     }
-  }, [orderStatus]);
+  }, [invoice]);
 
-  // ADD PRODUCT (increment if exists)
+  // 🔹 ADD PRODUCT
   const addProduct = (product) => {
+    if (!isAdmin && isCompleted) return;
+
     setSelectedProducts((prev) => {
       const exists = prev.find((p) => p.productId === product._id);
 
@@ -72,7 +79,10 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
     });
   };
 
+  // 🔹 UPDATE QTY
   const updateQty = (id, qty) => {
+    if (!isAdmin && isCompleted) return;
+
     if (qty <= 0) {
       setSelectedProducts((prev) => prev.filter((p) => p.productId !== id));
       return;
@@ -87,194 +97,190 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
     (acc, p) => acc + p.quantity * p.price,
     0,
   );
-
-  const handleSubmit = async () => {
-    // ❌ Cannot set debt without customer
-    if (paymentStatus === "debt" && !personId) {
-      return alert("Debt requires a customer");
-    }
-
-    // ❌ Cannot complete without payment decision
-    if (orderStatus === "completed" && paymentStatus === "unpaid") {
-      return alert("Completed order must be Paid or Debt");
-    }
-
+  const handlePrintInvoice = async () => {
     try {
-      await updateOrder(order._id, {
-        products: selectedProducts,
-        total,
-        personId: personId || null,
-        orderStatus,
-        paymentStatus,
-      });
+      const res = await ensureInvoice(order._id);
 
-      onSuccess();
-      onClose();
+      setInvoice(res.data);
     } catch (err) {
       console.error(err);
+      alert("Failed to generate invoice");
     }
   };
+  // 🔹 COMPLETE ORDER
+  const completeOrder = async (paymentType) => {
+    if (!isAdmin && isCompleted) return;
 
+    if (paymentType === "debt" && !personId) {
+      return alert("Debt requires customer");
+    }
+
+    await updateOrder(order._id, {
+      orderStatus: "completed",
+      paymentStatus: paymentType,
+      personId: personId || null,
+    });
+
+    // 🔥 ALWAYS ensure invoice after completion
+    const res = await ensureInvoice(order._id);
+    setInvoice(res.data);
+
+    onSuccess();
+
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
-      {/* MODAL */}
-      <div
-        className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          color: "var(--color-text)",
-        }}
-      >
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-bold">Update Order</h2>
-          <button onClick={onClose} className="text-xl">
-            ✕
-          </button>
+    <>
+      {/* 🔥 PRINT AREA (VERY IMPORTANT) */}
+      {invoice && (
+        <div style={{ position: "absolute", top: "-9999px" }}>
+          <Invoice invoice={invoice} />
         </div>
-
-        {/* SCROLLABLE CONTENT */}
-        <div className="flex-1 overflow-y-auto pr-1">
-          {/* CUSTOMER */}
-          <div className="mb-3">
-            <label className="text-sm font-medium mb-1 block">Customer</label>
-            <select
-              className="w-full p-3 rounded-lg border"
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-            >
-              <option value="">Walk-in</option>
-              {persons.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+      )}
+      {/* 🔥 MODAL */}
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
+        <div
+          className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            color: "var(--color-text)",
+          }}
+        >
+          {/* HEADER */}
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-bold">Update Order</h2>
+            <button onClick={onClose}>✕</button>
           </div>
 
-          {/* ADD PRODUCTS */}
-          <p className="text-sm font-semibold mb-1">Add Products</p>
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
-            {products.map((p) => (
-              <button
-                key={p._id}
-                onClick={() => addProduct(p)}
-                className="min-w-[100px] p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
-                }}
+          {/* LOCK MESSAGE */}
+          {isCompleted && !isAdmin && (
+            <div className="mb-3 p-2 rounded bg-gray-200 text-center text-sm">
+              🔒 Completed order (read-only)
+            </div>
+          )}
+
+          {/* CONTENT */}
+          <div className="flex-1 overflow-y-auto pr-1">
+            {/* CUSTOMER */}
+            <div className="mb-3">
+              <label className="text-sm">Customer</label>
+              <select
+                disabled={!isAdmin && isCompleted}
+                value={personId}
+                onChange={(e) => setPersonId(e.target.value)}
+                className="w-full p-3 border rounded"
               >
-                {p.name}
-              </button>
-            ))}
-          </div>
+                <option value="">Walk-in</option>
+                {persons.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* SELECTED PRODUCTS */}
-          <p className="text-sm font-semibold mb-1">Items</p>
-
-          <div className="space-y-2 mb-4">
-            {selectedProducts.map((p) => (
-              <div
-                key={p.productId}
-                className="flex justify-between items-center p-2 rounded-lg"
-                style={{
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                <div>
-                  <p className="text-sm">{p.name}</p>
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--color-muted)" }}
-                  >
-                    ₱ {p.price}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
+            {/* PRODUCTS */}
+            <div className="mb-3">
+              <p className="text-sm font-semibold">Products</p>
+              <div className="flex gap-2 overflow-x-auto">
+                {products.map((p) => (
                   <button
-                    onClick={() => updateQty(p.productId, p.quantity - 1)}
-                    className="px-3 py-1 rounded border"
+                    key={p._id}
+                    disabled={!isAdmin && isCompleted}
+                    onClick={() => addProduct(p)}
+                    className="p-2 border rounded"
                   >
-                    -
+                    {p.name}
                   </button>
-
-                  <span>{p.quantity}</span>
-
-                  <button
-                    onClick={() => updateQty(p.productId, p.quantity + 1)}
-                    className="px-3 py-1 rounded border"
-                  >
-                    +
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* ITEMS */}
+            <div className="mb-4 space-y-2">
+              {selectedProducts.map((p) => (
+                <div
+                  key={p.productId}
+                  className="flex justify-between items-center border p-2 rounded"
+                >
+                  <div>
+                    <p>{p.name}</p>
+                    <p className="text-xs">₱ {p.price}</p>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <button
+                      disabled={!isAdmin && isCompleted}
+                      onClick={() => updateQty(p.productId, p.quantity - 1)}
+                    >
+                      -
+                    </button>
+
+                    <span>{p.quantity}</span>
+
+                    <button
+                      disabled={!isAdmin && isCompleted}
+                      onClick={() => updateQty(p.productId, p.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* FOOTER (STICKY ACTIONS) */}
-        <div className="pt-3 border-t">
-          <div className="flex justify-between mb-2">
-            <span>Total</span>
-            <span className="font-bold">₱ {total}</span>
-          </div>
+          {/* FOOTER */}
+          <div className="pt-3 border-t">
+            <div className="flex justify-between mb-2">
+              <span>Total</span>
+              <span className="font-bold">₱ {total}</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {/* ✅ COMPLETED → PRINT ONLY */}
+              {isCompleted ? (
+                <button
+                  onClick={handlePrintInvoice}
+                  className="w-full py-3 rounded text-white bg-black"
+                >
+                  🧾 Print Invoice
+                </button>
+              ) : (
+                <>
+                  {/* ADMIN */}
+                  {isAdmin ? (
+                    <>
+                      <button
+                        onClick={() => completeOrder("paid")}
+                        className="w-full py-3 bg-green-600 text-white rounded"
+                      >
+                        ✅ Complete (Paid)
+                      </button>
 
-          {/* PRIMARY ACTIONS */}
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={async () => {
-                await updateOrder(order._id, {
-                  orderStatus: "completed",
-                  paymentStatus: "paid",
-                  personId,
-                });
+                      <button
+                        onClick={() => completeOrder("debt")}
+                        className="w-full py-3 bg-orange-500 text-white rounded"
+                      >
+                        💳 Complete as Debt
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center text-sm text-gray-500">
+                      Only admin can complete orders
+                    </div>
+                  )}
+                </>
+              )}
 
-                onSuccess();
-                onClose();
-              }}
-              className="w-full py-3 rounded text-white"
-              style={{ backgroundColor: "green" }}
-            >
-              ✅ Complete (Paid)
-            </button>
-
-            <button
-              onClick={async () => {
-                if (!personId) {
-                  return alert("Debt requires customer");
-                }
-
-                await updateOrder(order._id, {
-                  orderStatus: "completed",
-                  paymentStatus: "debt",
-                  personId,
-                });
-
-                onSuccess();
-                onClose();
-              }}
-              className="w-full py-3 rounded text-white"
-              style={{ backgroundColor: "orange" }}
-            >
-              💳 Complete as Debt
-            </button>
-
-            <button
-              onClick={handleSubmit}
-              className="w-full py-3 rounded text-white"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
-              Save Changes
-            </button>
-
-            <button onClick={onClose} className="w-full py-2 rounded border">
-              Cancel
-            </button>
+              <button onClick={onClose} className="border py-2 rounded">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

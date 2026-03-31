@@ -10,6 +10,8 @@ import ProductPage from "../features/products/pages/ProductPage.jsx";
 import POSPage from "../features/orders/pages/PosPage.jsx";
 import OrdersPage from "../features/orders/pages/OrdersPage.jsx";
 import FinancialPage from "../features/financials/pages/FinancialPage.jsx";
+import InvoicesPage from "../features/invoices/pages/InvoicePage.jsx";
+import ExpensePage from "../features/financials/pages/ExpensePage.jsx";
 
 const router = createBrowserRouter([
   {
@@ -53,6 +55,14 @@ const router = createBrowserRouter([
           {
             path: "/finances",
             element: <FinancialPage />,
+          },
+          {
+            path: "/invoices",
+            element: <InvoicesPage />,
+          },
+          {
+            path: "/expenses",
+            element: <ExpensePage />,
           },
         ],
       },

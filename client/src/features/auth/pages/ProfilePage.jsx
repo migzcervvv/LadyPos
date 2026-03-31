@@ -16,7 +16,13 @@ export default function ProfilePage() {
 
   const [editingIdentifier, setEditingIdentifier] = useState(false);
   const [identifierValue, setIdentifierValue] = useState(user.identifier);
+  const [profile, setProfile] = useState({
+    name: user.name || "",
+    phone: user.phone || "",
+    address: user.address || "",
+  });
 
+  const [editingProfile, setEditingProfile] = useState(false);
   const [passwordValue, setPasswordValue] = useState("");
   const [editingPassword, setEditingPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -38,6 +44,17 @@ export default function ProfilePage() {
 
     fetchUsers();
   }, [user, jwt]);
+
+  useEffect(() => {
+    if (!user) return;
+    setProfile({
+      name: user.name || "",
+      phone: user.phone || "",
+      address: user.address || "",
+    });
+
+    setIdentifierValue(user.identifier);
+  }, [user]);
 
   // =========================
   // DELETE USER
@@ -62,6 +79,9 @@ export default function ProfilePage() {
         identifier: u.identifier,
         role: u.role,
         confirmed: u.confirmed,
+        name: u.name,
+        phone: u.phone,
+        address: u.address,
       };
 
       if (u.password) {
@@ -110,39 +130,171 @@ export default function ProfilePage() {
     }
   };
 
+  const normalizePHPhone = (phone) => {
+    if (!phone) return "";
+
+    let cleaned = phone.replace(/\s+/g, "");
+
+    if (cleaned.startsWith("0")) {
+      cleaned = "+63" + cleaned.substring(1);
+    }
+
+    if (cleaned.startsWith("63")) {
+      cleaned = "+" + cleaned;
+    }
+
+    return cleaned;
+  };
+
+  const isValidPHPhone = (phone) => {
+    // Must be +639XXXXXXXXX
+    return /^\+639\d{9}$/.test(phone);
+  };
+
+  const handleProfileSave = async () => {
+    try {
+      const normalizedPhone = normalizePHPhone(profile.phone);
+
+      if (normalizedPhone && !isValidPHPhone(normalizedPhone)) {
+        alert("Invalid PH mobile number. Use 09XXXXXXXXX or +639XXXXXXXXX");
+        return;
+      }
+
+      await editUser(
+        {
+          _id: user._id,
+          name: profile.name,
+          phone: normalizedPhone,
+          address: profile.address,
+        },
+        jwt,
+      );
+
+      // update local state so UI reflects immediately
+      setProfile((prev) => ({
+        ...prev,
+        name: profile.name,
+        phone: normalizedPhone,
+        address: profile.address,
+      }));
+
+      setEditingProfile(false);
+    } catch (err) {
+      console.error("Failed to update profile:", err);
+    }
+  };
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* ========================= */}
       {/* PROFILE SECTION */}
       {/* ========================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {/* Identifier */}
-        <div className="bg-[var(--color-surface)] p-4 rounded shadow flex justify-between">
-          <div className="flex-1">
-            <p className="font-semibold">Identifier</p>
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* ================= PROFILE CARD ================= */}
+        <div className="bg-white rounded-2xl shadow-sm border p-5">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Profile</h2>
+              <p className="text-sm text-gray-500">
+                Manage your personal information
+              </p>
+            </div>
 
-            {editingIdentifier ? (
-              <input
-                className="border rounded p-2 mt-1 w-full"
-                value={identifierValue}
-                onChange={(e) => setIdentifierValue(e.target.value)}
-              />
-            ) : (
-              <p className="mt-1">{identifierValue}</p>
+            {!editingProfile && (
+              <button
+                className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                onClick={() => setEditingProfile(true)}
+              >
+                Edit
+              </button>
             )}
           </div>
 
-          <div className="flex flex-col gap-1">
-            {editingIdentifier ? (
-              <>
+          {editingProfile ? (
+            <div className="grid grid-cols-1 gap-3">
+              <input
+                className="input"
+                placeholder="Full name"
+                value={profile.name}
+                onChange={(e) =>
+                  setProfile({ ...profile, name: e.target.value })
+                }
+              />
+
+              <input
+                className="input"
+                placeholder="Phone number"
+                value={profile.phone}
+                maxLength={13}
+                inputMode="numeric"
+                onChange={(e) =>
+                  setProfile({ ...profile, phone: e.target.value })
+                }
+              />
+
+              <input
+                className="input"
+                placeholder="Address"
+                value={profile.address}
+                onChange={(e) =>
+                  setProfile({ ...profile, address: e.target.value })
+                }
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
-                  className="bg-[var(--color-primary)] text-white px-3 py-1 rounded"
-                  onClick={handleIdentifierSave}
+                  className="btn-secondary"
+                  onClick={() => setEditingProfile(false)}
                 >
+                  Cancel
+                </button>
+
+                <button className="btn-primary" onClick={handleProfileSave}>
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400">Name</p>
+                <p className="font-medium">{profile.name || "-"}</p>
+              </div>
+
+              <div>
+                <p className="text-gray-400">Phone</p>
+                <p className="font-medium">{profile.phone || "-"}</p>
+              </div>
+
+              <div className="sm:col-span-2">
+                <p className="text-gray-400">Address</p>
+                <p className="font-medium">{profile.address || "-"}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ================= SECURITY CARD ================= */}
+        <div className="bg-white rounded-2xl shadow-sm border p-5">
+          <h2 className="text-lg font-semibold mb-4">Security</h2>
+
+          {/* ================= IDENTIFIER ================= */}
+          <div className="border-b py-3">
+            <p className="text-sm text-gray-400 mb-1">Identifier</p>
+
+            {editingIdentifier ? (
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  value={identifierValue}
+                  onChange={(e) => setIdentifierValue(e.target.value)}
+                />
+
+                <button className="btn-primary" onClick={handleIdentifierSave}>
                   Save
                 </button>
+
                 <button
-                  className="bg-[var(--color-muted)] px-3 py-1 rounded"
+                  className="btn-secondary"
                   onClick={() => {
                     setEditingIdentifier(false);
                     setIdentifierValue(user.identifier);
@@ -150,50 +302,48 @@ export default function ProfilePage() {
                 >
                   Cancel
                 </button>
-              </>
+              </div>
             ) : (
-              <button
-                className="bg-[var(--color-accent)] text-white px-3 py-1 rounded"
-                onClick={() => setEditingIdentifier(true)}
-              >
-                Edit
-              </button>
-            )}
-          </div>
-        </div>
+              <div className="flex justify-between items-center">
+                <p className="font-medium">{identifierValue}</p>
 
-        {/* Password */}
-        <div className="bg-[var(--color-surface)] p-4 rounded shadow flex justify-between">
-          <div className="flex-1">
-            <p className="font-semibold">Password</p>
-
-            {editingPassword ? (
-              <input
-                className="border rounded p-2 mt-1 w-full"
-                type={showPassword ? "text" : "password"}
-                value={passwordValue}
-                onChange={(e) => setPasswordValue(e.target.value)}
-              />
-            ) : (
-              <p className="mt-1">{"•".repeat(8)}</p>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setEditingIdentifier(true)}
+                >
+                  Edit
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-1">
+          {/* ================= PASSWORD ================= */}
+          <div className="py-3">
+            <p className="text-sm text-gray-400 mb-1">Password</p>
+
             {editingPassword ? (
-              <>
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  type={showPassword ? "text" : "password"}
+                  value={passwordValue}
+                  onChange={(e) => setPasswordValue(e.target.value)}
+                />
+
                 <button onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? "🙈" : "👁️"}
                 </button>
+
                 <button
-                  className="bg-[var(--color-primary)] text-white px-3 py-1 rounded"
+                  className="btn-primary"
                   onClick={handlePasswordSave}
                   disabled={!passwordValue}
                 >
                   Save
                 </button>
+
                 <button
-                  className="bg-[var(--color-muted)] px-3 py-1 rounded"
+                  className="btn-secondary"
                   onClick={() => {
                     setEditingPassword(false);
                     setPasswordValue("");
@@ -202,31 +352,28 @@ export default function ProfilePage() {
                 >
                   Cancel
                 </button>
-              </>
+              </div>
             ) : (
-              <button
-                className="bg-[var(--color-accent)] text-white px-3 py-1 rounded"
-                onClick={() => setEditingPassword(true)}
-              >
-                Edit
-              </button>
+              <div className="flex justify-between items-center">
+                <p className="font-medium">••••••••</p>
+
+                <button
+                  className="btn-secondary"
+                  onClick={() => setEditingPassword(true)}
+                >
+                  Change
+                </button>
+              </div>
             )}
           </div>
         </div>
-
-        {/* Role */}
-        <div className="bg-[var(--color-surface)] p-4 rounded shadow">
-          <p className="font-semibold">Role</p>
-          <p className="mt-1">{user.role}</p>
-        </div>
       </div>
-
       {/* ========================= */}
       {/* ADMIN SECTION */}
       {/* ========================= */}
       {user.role === "admin" && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Users Management</h2>
+          <h2 className="text-2xl font-bold my-4">Users Management</h2>
 
           <button
             className="mb-4 bg-[var(--color-primary)] text-white px-4 py-2 rounded"

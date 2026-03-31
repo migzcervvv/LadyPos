@@ -12,7 +12,7 @@ export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [persons, setPersons] = useState([]);
   const [customerType, setCustomerType] = useState("walkin");
-
+  const [reference, setReference] = useState("");
   const [cart, setCart] = useState([]);
   const [personId, setPersonId] = useState("");
   const navigate = useNavigate();
@@ -65,8 +65,11 @@ export default function POSPage() {
     try {
       await createOrder({
         products: cart,
-        total,
         personId: customerType === "customer" ? personId : null,
+        customerType,
+        reference: ["grab", "foodpanda"].includes(customerType)
+          ? reference
+          : null,
       });
 
       // reset
@@ -156,6 +159,7 @@ export default function POSPage() {
                   key={type}
                   onClick={() => {
                     setCustomerType(type);
+                    setReference(""); // ✅ reset reference
                     if (type !== "customer") setPersonId("");
                   }}
                   className={`py-2 rounded-lg text-sm font-medium transition ${
@@ -193,6 +197,8 @@ export default function POSPage() {
 
             {customerType === "grab" && (
               <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
                 placeholder="Grab reference (optional)"
                 className="w-full p-2 border rounded"
               />
@@ -200,6 +206,8 @@ export default function POSPage() {
 
             {customerType === "foodpanda" && (
               <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
                 placeholder="Foodpanda reference (optional)"
                 className="w-full p-2 border rounded"
               />

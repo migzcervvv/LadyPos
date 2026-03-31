@@ -6,6 +6,8 @@ import productRoutes from "./routes/ProductRoute.js";
 import personRoutes from "./routes/PersonRoute.js";
 import orderRoutes from "./routes/OrderRoute.js";
 import financialRoutes from "./routes/FinancialRoute.js";
+import invoiceRoutes from "./routes/InvoiceRoute.js";
+import expenseRoutes from "./routes/ExpenseRoute.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import { logger } from "./middleware/logger.js";
 import cors from "cors";
@@ -45,6 +47,9 @@ app.use("/api/products", productRoutes);
 app.use("/api/people", personRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/financials", financialRoutes);
+app.use("/api/invoices", invoiceRoutes);
+app.use("/api/expenses", expenseRoutes);
+
 app.use(errorHandler);
 
 app.listen(5000, () => {

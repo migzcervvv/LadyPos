@@ -3,13 +3,22 @@ import { addDebtToPerson, addPaymentToPerson } from "../utils/personService.js";
 
 // Create Order (Authenticated user only)
 import mongoose from "mongoose";
+import { createInvoiceFromOrder } from "./InvoiceController.js";
 
 export async function createOrder(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const { products, personId, paymentStatus } = req.body;
+    const {
+      products,
+      personId,
+      paymentStatus,
+      customerType,
+      reference,
+      paymentMethod,
+      notes,
+    } = req.body;
     const userId = req.user.id;
 
     // ✅ Validation
@@ -28,15 +37,24 @@ export async function createOrder(req, res) {
       throw new Error("Invalid total amount");
     }
 
+    if (customerType === "customer" && !personId) {
+      throw new Error("Customer orders require personId");
+    }
+
     // ✅ Create order (not saved yet)
     const order = new Order({
       userId,
-      personId,
+      personId:
+        personId && mongoose.Types.ObjectId.isValid(personId) ? personId : null,
       products,
       total,
       paymentStatus,
+      customerType,
+      reference,
+      paymentMethod,
+      notes,
       orderStatus: "pending",
-      ledgerRecorded: paymentStatus === "debt", // pre-set
+      ledgerRecorded: paymentStatus === "debt",
     });
 
     // ✅ Save order inside transaction
@@ -108,45 +126,76 @@ export async function updateOrder(req, res) {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    const { paymentStatus, orderStatus } = req.body;
+    const isAdmin = req.user.role === "admin";
+    const wasCompleted = order.orderStatus === "completed";
 
-    // 🧠 Validate status transitions
-    if (order.orderStatus === "completed" && orderStatus === "pending") {
-      return res.status(400).json({
-        error: "Cannot revert a completed order back to pending",
+    const { paymentStatus, orderStatus, personId } = req.body;
+
+    // 🔒 NON-ADMIN cannot modify completed orders
+    if (wasCompleted && !isAdmin) {
+      return res.status(403).json({
+        error: "Only admins can modify completed orders",
       });
     }
 
-    // Update other fields explicitly
-    if (orderStatus === "completed" && paymentStatus === "unpaid") {
-      throw new Error("Completed order must be paid or debt");
+    // ❌ Prevent reverting completed → pending
+    if (wasCompleted && orderStatus === "pending") {
+      return res.status(400).json({
+        error: "Cannot revert completed order",
+      });
     }
-    if (orderStatus) order.orderStatus = orderStatus;
 
-    // Now trigger ledger if completed
-    if (
-      !order.ledgerRecorded &&
-      order.orderStatus === "completed" &&
-      order.personId
-    ) {
-      if (order.paymentStatus === "debt") {
-        await addDebtToPerson({
-          personId: order.personId,
-          userId: req.user.id,
-          amount: order.total,
-          orderId: order._id,
-          notes: "Order converted to debt",
-          paymentMethod: order.paymentMethod,
-        });
-      } else if (order.paymentStatus === "paid") {
-        await addPaymentToPerson({
-          personId: order.personId,
-          userId: req.user.id,
-          amount: order.total,
-          notes: "Order fully paid",
-          paymentMethod: order.paymentMethod,
+    // ✅ Update fields
+    if (personId !== undefined) {
+      if (!personId || personId === "") {
+        order.personId = null; // ✅ Walk-in
+      } else if (mongoose.Types.ObjectId.isValid(personId)) {
+        order.personId = personId; // ✅ Valid ID
+      } else {
+        return res.status(400).json({
+          error: "Invalid personId",
         });
       }
+    }
+    if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (orderStatus) order.orderStatus = orderStatus.toLowerCase();
+
+    // 🔥 HANDLE COMPLETION (ONLY ON FIRST TIME)
+    if (!wasCompleted && order.orderStatus === "completed") {
+      // ✅ VALIDATION
+      if (!["paid", "debt"].includes(order.paymentStatus)) {
+        return res.status(400).json({
+          error: "Completed order must be paid or debt",
+        });
+      }
+
+      // 🔥 CREATE INVOICE (ONLY ONCE)
+      await createInvoiceFromOrder(order._id);
+
+      // 🔥 LEDGER LOGIC
+      if (order.personId) {
+        if (order.paymentStatus === "debt") {
+          await addDebtToPerson({
+            personId: order.personId,
+            userId: req.user.id,
+            amount: order.total,
+            orderId: order._id,
+            notes: "Order converted to debt",
+            paymentMethod: order.paymentMethod,
+          });
+        }
+
+        if (order.paymentStatus === "paid") {
+          await addPaymentToPerson({
+            personId: order.personId,
+            userId: req.user.id,
+            amount: order.total,
+            notes: "Order fully paid",
+            paymentMethod: order.paymentMethod,
+          });
+        }
+      }
+
       order.ledgerRecorded = true;
     }
 
@@ -154,7 +203,8 @@ export async function updateOrder(req, res) {
 
     res.json(order);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.log("Update Order Error:", err);
+    res.status(500).json({ error: err.message });
   }
 }
 

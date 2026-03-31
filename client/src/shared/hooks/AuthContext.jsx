@@ -36,6 +36,9 @@ export function AuthProvider({ children }) {
         identifier: data.identifier,
         role: data.role,
         confirmed: data.confirmed,
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
       };
 
       setJwt(data.token);

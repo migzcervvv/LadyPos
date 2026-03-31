@@ -1,3 +1,4 @@
+// services/financialApi.js
 import axios from "axios";
 import { useAuth } from "../../../shared/hooks/AuthContext.jsx";
 import { useMemo } from "react";
@@ -16,14 +17,20 @@ export function useFinancialApi() {
     });
   }, [jwt]);
 
+  const getSummary = async (range) => {
+    const res = await axiosInstance.get(`${API_URL}/summary?range=${range}`);
+    return res.data;
+  };
+
   const getDashboard = async () => {
     const res = await axiosInstance.get(`${API_URL}/dashboard`);
     return res.data;
   };
+
   const getDayDetails = async (date) => {
     const res = await axiosInstance.get(`${API_URL}/day/${date}`);
     return res.data;
   };
 
-  return { getDashboard, getDayDetails };
+  return { getSummary, getDashboard, getDayDetails };
 }

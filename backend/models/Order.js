@@ -28,6 +28,7 @@ const orderSchema = new Schema(
       enum: ["pending", "completed"],
       default: "pending",
     },
+    reference: { type: String, required: false }, // for external orders
     date: { type: Date, default: Date.now },
     paymentMethod: { type: String, default: "Cash" },
     notes: { type: String },

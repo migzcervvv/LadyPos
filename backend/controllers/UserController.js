@@ -59,6 +59,9 @@ export async function loginUser(req, res) {
         role: user.role,
         token: await generateToken(user),
         confirmed: user.confirmed,
+        name: user.name,
+        phone: user.phone,
+        address: user.address,
       });
     } else {
       res.status(401).json({ message: "Invalid credentials" });
@@ -109,7 +112,6 @@ export async function updateUser(req, res) {
     if (req.user.id !== user._id.toString() && req.user.role !== "admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
-
     // Update identifier if provided
     if (req.body.identifier) user.identifier = req.body.identifier;
 
@@ -118,7 +120,9 @@ export async function updateUser(req, res) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(req.body.password, salt);
     }
-
+    if (req.body.name !== undefined) user.name = req.body.name;
+    if (req.body.phone !== undefined) user.phone = req.body.phone;
+    if (req.body.address !== undefined) user.address = req.body.address;
     // Update confirmed field if provided
     if (typeof req.body.confirmed === "boolean") {
       user.confirmed = req.body.confirmed;
@@ -135,6 +139,9 @@ export async function updateUser(req, res) {
       identifier: user.identifier,
       role: user.role,
       confirmed: user.confirmed,
+      name: user.name,
+      phone: user.phone,
+      address: user.address,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });

@@ -18,7 +18,9 @@ export default function Layout({ children }) {
     { name: "Customers", path: "/customers" },
     { name: "Orders", path: "/pos" },
     { name: "Products", path: "/products" },
+    { name: "Invoices", path: "/invoices" },
     { name: "Finances", path: "/finances" },
+    { name: "Expenses", path: "/expenses" },
     { name: "Logout", path: "/logout" },
   ];
 
