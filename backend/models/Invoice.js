@@ -10,7 +10,7 @@ const invoiceItemSchema = new Schema({
 });
 
 const invoiceSchema = new Schema({
-  invoiceNumber: { type: String, unique: true },
+  invoiceNumber: { type: String, required: true },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
 
   orderId: { type: Schema.Types.ObjectId, ref: "Order" },
@@ -39,5 +39,8 @@ const invoiceSchema = new Schema({
 
   notes: String,
 });
+
+// 🔥 THIS is the important part
+invoiceSchema.index({ invoiceNumber: 1, userId: 1 }, { unique: true });
 
 export default mongoose.model("Invoice", invoiceSchema);

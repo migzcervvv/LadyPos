@@ -162,9 +162,8 @@ export async function updateOrder(req, res) {
           error: "Completed order must be paid or debt",
         });
       }
-
       // 🔥 CREATE INVOICE (ONLY ONCE)
-      await createInvoiceFromOrder(order._id);
+      await createInvoiceFromOrder(order._id, req.user.id);
 
       // 🔥 LEDGER LOGIC
       if (order.personId) {

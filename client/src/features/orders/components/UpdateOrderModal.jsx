@@ -109,8 +109,6 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
   };
   // 🔹 COMPLETE ORDER
   const completeOrder = async (paymentType) => {
-    if (!isAdmin && isCompleted) return;
-
     if (paymentType === "debt" && !personId) {
       return alert("Debt requires customer");
     }
