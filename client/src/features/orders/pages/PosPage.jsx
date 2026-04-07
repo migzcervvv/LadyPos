@@ -121,7 +121,7 @@ export default function POSPage() {
 
         {/* RIGHT: CART */}
         <div
-          className="h-[45%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-hidden"
+          className="max-h-[65%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-hidden"
           style={{
             borderLeft: "1px solid var(--color-border)",
             backgroundColor: "var(--color-surface)",
@@ -217,7 +217,7 @@ export default function POSPage() {
           {/* CART ITEMS */}
           <div
             className="flex-1 overflow-y-auto mb-4"
-            style={{ maxHeight: "60vh" }}
+            style={{ maxHeight: "60vh", minHeight: "15vh" }}
           >
             {cart.length === 0 && (
               <p style={{ color: "var(--color-muted)" }}>No items yet</p>
