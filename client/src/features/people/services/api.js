@@ -3,35 +3,25 @@ import { useApi } from "../../../shared/utils/useApi";
 export function usePersonApi() {
   const api = useApi();
 
-  const getPersons = async () => {
-    const res = await api.get("/people");
-    return res;
-  };
+  const getPersons = () => api.get("/people");
 
-  const createPerson = async (data) => {
-    const res = await api.post("/people", data);
-    return res;
-  };
+  const createPerson = (data) => api.post("/people", data);
 
-  const getPersonById = async (id) => {
-    const res = await api.get(`/people/${id}`);
-    return res;
-  };
+  const getPersonById = (id) => api.get(`/people/${id}`);
 
-  const addDebt = async (personId, data) => {
-    const res = await api.post(`/people/${personId}/debts`, data);
-    return res;
-  };
+  const addDebt = (personId, data) =>
+    api.post(`/people/${personId}/debts`, data);
 
-  const addPayment = async (personId, data) => {
-    const res = await api.post(`/people/${personId}/payments`, data);
-    return res;
-  };
+  const addPayment = (personId, data) =>
+    api.post(`/people/${personId}/payments`, data);
 
-  const payAllDebts = async (personId) => {
-    const res = await api.post(`/people/${personId}/pay-all`);
-    return res;
-  };
+  const payAllDebts = (personId) => api.post(`/people/${personId}/pay-all`);
+
+  const updateTransaction = (personId, debtId, data) =>
+    api.put(`/people/${personId}/debts/${debtId}`, data);
+
+  const deleteTransaction = (personId, debtId) =>
+    api.delete(`/people/${personId}/debts/${debtId}`);
 
   return {
     getPersons,
@@ -40,5 +30,7 @@ export function usePersonApi() {
     addDebt,
     addPayment,
     payAllDebts,
+    updateTransaction,
+    deleteTransaction,
   };
 }

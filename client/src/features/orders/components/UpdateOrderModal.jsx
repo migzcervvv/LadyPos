@@ -124,10 +124,6 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
     setInvoice(res.data);
 
     onSuccess();
-
-    setTimeout(() => {
-      window.print();
-    }, 300);
   };
   return (
     <>

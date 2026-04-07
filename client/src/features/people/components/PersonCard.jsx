@@ -3,21 +3,27 @@ import { useState } from "react";
 import DebtForm from "../components/DebtForm";
 
 export default function PersonCard({ person, refresh }) {
-  const { addDebt, addPayment } = usePersonApi();
-
+  const { addTransaction } = usePersonApi();
   const [showDebtForm, setShowDebtForm] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const balance =
-    person.transactions?.length > 0 ? person.transactions[0].balanceAfter : 0;
+  const balance = person.debts?.reduce((acc, t) => {
+    if (t.kind === "charge") return acc + t.amount;
+    if (t.kind === "payment" && t.context === "debt") return acc - t.amount;
+    return acc;
+  }, 0);
 
   const handleAdd = async (data) => {
-    if (isPayment) {
-      await addPayment(person._id, data);
-    } else {
-      await addDebt(person._id, data);
-    }
+    const payload = {
+      amount: data.amount,
+      notes: data.notes,
+      kind: isPayment ? "payment" : "charge",
+      context: "debt", // 🔥 manual entries always affect debt
+    };
+
+    await addTransaction(person._id, payload);
+
     refresh();
     setShowDebtForm(false);
   };
@@ -89,8 +95,7 @@ export default function PersonCard({ person, refresh }) {
         {open && (
           <div className="mt-2 p-2 rounded-2xl bg-gray-50 border space-y-2 max-h-64 overflow-y-auto">
             {person.transactions?.map((t) => {
-              const isDebt = t.type?.toLowerCase() === "debt";
-
+              const isDebt = t.kind === "charge";
               return (
                 <div
                   key={t.id}
@@ -104,7 +109,7 @@ export default function PersonCard({ person, refresh }) {
                   {/* LEFT */}
                   <div>
                     <p className="font-medium text-gray-800">
-                      {t.type} • ₱{t.amount}
+                      {t.kind} • {t.context}
                     </p>
 
                     <p className="text-xs text-gray-500">
@@ -126,9 +131,7 @@ export default function PersonCard({ person, refresh }) {
                   {/* RIGHT */}
                   <div className="text-right text-xs">
                     <p className="text-gray-400">Balance</p>
-                    <p className="font-semibold text-gray-700">
-                      ₱{t.balanceAfter}
-                    </p>
+                    <p className="font-semibold text-gray-700">₱{t.amount}</p>
                   </div>
                 </div>
               );

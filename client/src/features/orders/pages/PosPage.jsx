@@ -83,7 +83,7 @@ export default function POSPage() {
   return (
     <>
       <div
-        className="h-screen flex flex-col md:flex-row overflow-hidden"
+        className="h-screen flex flex-col md:flex-row overflow-hidden min-h-screen"
         style={{
           backgroundColor: "var(--color-bg)",
           color: "var(--color-text)",
@@ -121,7 +121,7 @@ export default function POSPage() {
 
         {/* RIGHT: CART */}
         <div
-          className="max-h-[65%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-hidden"
+          className="max-h-[65%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-auto"
           style={{
             borderLeft: "1px solid var(--color-border)",
             backgroundColor: "var(--color-surface)",

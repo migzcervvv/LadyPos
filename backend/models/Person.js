@@ -3,9 +3,15 @@ const Schema = _Schema;
 
 const debtSchema = new Schema(
   {
-    type: {
+    kind: {
       type: String,
-      enum: ["debt", "payment"],
+      enum: ["charge", "payment"],
+      required: true,
+    },
+
+    context: {
+      type: String,
+      enum: ["order", "debt", "adjustment"],
       required: true,
     },
 
@@ -33,7 +39,6 @@ const debtSchema = new Schema(
   },
   { _id: true },
 );
-
 const personSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

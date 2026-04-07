@@ -1,10 +1,45 @@
 import Order from "../models/Order.js";
-import { addDebtToPerson, addPaymentToPerson } from "../utils/personService.js";
-
-// Create Order (Authenticated user only)
+import Person from "../models/Person.js";
 import mongoose from "mongoose";
 import { createInvoiceFromOrder } from "./InvoiceController.js";
 
+//
+// 🔥 HELPER: Add transaction to person
+//
+async function addTransaction({
+  personId,
+  kind,
+  context,
+  amount,
+  orderId,
+  paymentMethod,
+  notes,
+  session,
+}) {
+  if (!personId) return;
+
+  await Person.findByIdAndUpdate(
+    personId,
+    {
+      $push: {
+        debts: {
+          kind,
+          context,
+          amount,
+          orderId,
+          paymentMethod,
+          notes,
+          date: new Date(),
+        },
+      },
+    },
+    { session },
+  );
+}
+
+//
+// CREATE ORDER
+//
 export async function createOrder(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -19,29 +54,21 @@ export async function createOrder(req, res) {
       paymentMethod,
       notes,
     } = req.body;
+
     const userId = req.user.id;
 
-    // ✅ Validation
-    if (!products || !Array.isArray(products) || products.length === 0) {
+    // ✅ validate
+    if (!products || !products.length) {
       throw new Error("Products are required");
     }
 
-    // ✅ Safe total calculation
     const total = products.reduce((sum, p) => {
-      const price = Number(p.price) || 0;
-      const qty = Number(p.quantity) || 0;
-      return sum + price * qty;
+      return sum + (Number(p.price) || 0) * (Number(p.quantity) || 0);
     }, 0);
 
-    if (total <= 0) {
-      throw new Error("Invalid total amount");
-    }
+    if (total <= 0) throw new Error("Invalid total");
 
-    if (customerType === "customer" && !personId) {
-      throw new Error("Customer orders require personId");
-    }
-
-    // ✅ Create order (not saved yet)
+    // ✅ create order
     const order = new Order({
       userId,
       personId:
@@ -54,25 +81,11 @@ export async function createOrder(req, res) {
       paymentMethod,
       notes,
       orderStatus: "pending",
-      ledgerRecorded: paymentStatus === "debt",
+      ledgerRecorded: false,
     });
 
-    // ✅ Save order inside transaction
     await order.save({ session });
 
-    // ✅ Handle debt safely
-    if (paymentStatus === "debt" && personId) {
-      await addDebtToPerson({
-        personId,
-        userId,
-        amount: total,
-        orderId: order._id,
-        notes: "Auto from order",
-        session, // 👈 pass session if your function supports it
-      });
-    }
-
-    // ✅ Commit transaction
     await session.commitTransaction();
     session.endSession();
 
@@ -85,12 +98,13 @@ export async function createOrder(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
-// Get Orders (User = own orders, Admin = all)
+
+//
+// GET ORDERS
+//
 export async function getOrders(req, res) {
   try {
-    const userId = req.user.id; // from auth middleware
-
-    const orders = await Order.find({ userId })
+    const orders = await Order.find({ userId: req.user.id })
       .populate("products.productId")
       .populate("personId", "name")
       .sort({ createdAt: -1 });
@@ -100,13 +114,18 @@ export async function getOrders(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
-// Get Single Order
+
+//
+// GET SINGLE ORDER
+//
 export async function getOrderById(req, res) {
   try {
     const order = await Order.findOne({
       _id: req.params.id,
       userId: req.user.id,
-    }).populate("products.productId");
+    })
+      .populate("products.productId")
+      .populate("personId", "name");
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
@@ -118,137 +137,166 @@ export async function getOrderById(req, res) {
   }
 }
 
-// Update Order
+//
+// UPDATE ORDER
+//
 export async function updateOrder(req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    }).session(session);
 
     if (!order) {
-      return res.status(404).json({ error: "Order not found" });
+      throw new Error("Order not found");
     }
 
-    const isAdmin = req.user.role === "admin";
     const wasCompleted = order.orderStatus === "completed";
 
     const { paymentStatus, orderStatus, personId } = req.body;
 
-    // ❌ Prevent reverting completed → pending
+    // ❌ prevent reverting
     if (wasCompleted && orderStatus === "pending") {
-      return res.status(400).json({
-        error: "Cannot revert completed order",
-      });
+      throw new Error("Cannot revert completed order");
     }
 
-    // ✅ Update fields
+    // ✅ update fields
     if (personId !== undefined) {
-      if (!personId || personId === "") {
-        order.personId = null; // ✅ Walk-in
-      } else if (mongoose.Types.ObjectId.isValid(personId)) {
-        order.personId = personId; // ✅ Valid ID
-      } else {
-        return res.status(400).json({
-          error: "Invalid personId",
-        });
-      }
+      order.personId =
+        personId && mongoose.Types.ObjectId.isValid(personId) ? personId : null;
     }
+
     if (paymentStatus) order.paymentStatus = paymentStatus;
     if (orderStatus) order.orderStatus = orderStatus.toLowerCase();
 
-    // 🔥 HANDLE COMPLETION (ONLY ON FIRST TIME)
+    //
+    // 🔥 HANDLE COMPLETION (ONLY ONCE)
+    //
     if (!wasCompleted && order.orderStatus === "completed") {
-      // ✅ VALIDATION
       if (!["paid", "debt"].includes(order.paymentStatus)) {
-        return res.status(400).json({
-          error: "Completed order must be paid or debt",
-        });
+        throw new Error("Invalid payment status");
       }
-      // 🔥 CREATE INVOICE (ONLY ONCE)
-      await createInvoiceFromOrder(order._id, req.user.id);
 
-      // 🔥 LEDGER LOGIC
-      if (order.personId) {
+      // 🔥 LEDGER ENTRY
+      if (order.personId && !order.ledgerRecorded) {
         if (order.paymentStatus === "debt") {
-          await addDebtToPerson({
+          await addTransaction({
             personId: order.personId,
-            userId: req.user.id,
+            kind: "charge",
+            context: "order",
             amount: order.total,
             orderId: order._id,
-            notes: "Order converted to debt",
             paymentMethod: order.paymentMethod,
+            notes: "Order charged to debt",
+            session,
           });
         }
 
         if (order.paymentStatus === "paid") {
-          await addPaymentToPerson({
+          await addTransaction({
             personId: order.personId,
-            userId: req.user.id,
+            kind: "payment",
+            context: "order", // 🔥 DOES NOT affect debt
             amount: order.total,
-            notes: "Order fully paid",
+            orderId: order._id,
             paymentMethod: order.paymentMethod,
+            notes: "Order paid",
+            session,
           });
         }
+
+        order.ledgerRecorded = true;
       }
 
-      order.ledgerRecorded = true;
+      // 🔥 CREATE INVOICE (SAFE)
+      try {
+        await createInvoiceFromOrder(order._id, req.user.id);
+      } catch (err) {
+        console.error("Invoice failed:", err.message);
+      }
     }
 
-    await order.save();
+    await order.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json(order);
   } catch (err) {
-    console.log("Update Order Error:", err);
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Update Order Error:", err);
     res.status(500).json({ error: err.message });
   }
 }
 
-export async function markAsPaid(req, res) {
-  const order = await Order.findById(req.params.id);
-
-  if (!order) return res.status(404).json({ error: "Order not found" });
-
-  order.paymentStatus = "paid";
-  await order.save();
-
-  res.json(order);
+//
+// MARK AS COMPLETED (Shortcut)
+//
+export async function markAsCompleted(req, res) {
+  try {
+    req.body.orderStatus = "completed";
+    return updateOrder(req, res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
-export async function markAsCompleted(req, res) {
-  const order = await Order.findById(req.params.id);
-  if (!order) return res.status(404).json({ error: "Order not found" });
+//
+// MARK AS PAID (SAFE)
+//
+export async function markAsPaid(req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  order.orderStatus = "completed";
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    }).session(session);
 
-  // Trigger ledger if needed
-  if (!order.ledgerRecorded && order.personId) {
-    if (order.paymentStatus === "debt") {
-      await addDebtToPerson({
+    if (!order) throw new Error("Order not found");
+
+    // Only convert debt → paid
+    if (order.paymentStatus === "debt" && order.personId) {
+      await addTransaction({
         personId: order.personId,
-        userId: req.user.id,
+        kind: "payment",
+        context: "debt", // 🔥 reduces debt
         amount: order.total,
         orderId: order._id,
-        notes: "Order converted to debt",
         paymentMethod: order.paymentMethod,
-      });
-    } else if (order.paymentStatus === "paid") {
-      await addPaymentToPerson({
-        personId: order.personId,
-        userId: req.user.id,
-        amount: order.total,
-        notes: "Order fully paid",
-        paymentMethod: order.paymentMethod,
+        notes: "Debt settled from order",
+        session,
       });
     }
-    order.ledgerRecorded = true;
-  }
 
-  await order.save();
-  res.json(order);
+    order.paymentStatus = "paid";
+
+    await order.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json(order);
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
+    res.status(500).json({ error: err.message });
+  }
 }
 
-// Delete Order
+//
+// DELETE ORDER
+//
 export async function deleteOrder(req, res) {
   try {
-    const order = await Order.findById({
+    const order = await Order.findOneAndDelete({
       _id: req.params.id,
       userId: req.user.id,
     });
@@ -256,7 +304,6 @@ export async function deleteOrder(req, res) {
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
-    await order.deleteOne();
 
     res.json({ message: "Order deleted" });
   } catch (err) {

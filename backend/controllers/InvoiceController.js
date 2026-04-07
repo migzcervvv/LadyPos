@@ -1,24 +1,26 @@
 import Invoice from "../models/Invoice.js";
 import Order from "../models/Order.js";
 import mongoose from "mongoose";
+import InvoiceCounter from "../models/InvoiceCounter.js";
 
 // Generate invoice number (per user)
 const generateInvoiceNumber = async (userId) => {
   const year = new Date().getFullYear();
 
-  const lastInvoice = await Invoice.findOne({ userId })
-    .sort({ createdAt: -1 })
-    .select("invoiceNumber");
+  const counter = await InvoiceCounter.findOneAndUpdate(
+    { userId, year },
+    { $inc: { seq: 1 } }, // ✅ ONLY this
+    {
+      upsert: true,
+      returnDocument: "after",
+    },
+  );
 
-  let nextNumber = 1;
-
-  if (lastInvoice?.invoiceNumber) {
-    const parts = lastInvoice.invoiceNumber.split("-");
-    const lastSeq = parseInt(parts[2], 10);
-    if (!isNaN(lastSeq)) nextNumber = lastSeq + 1;
+  if (!counter || typeof counter.seq !== "number") {
+    throw new Error("Failed to generate counter");
   }
 
-  return `INV-${year}-${String(nextNumber).padStart(4, "0")}`;
+  return `INV-${year}-${String(counter.seq).padStart(4, "0")}`;
 };
 
 // Create from Order (SAFE VERSION)
