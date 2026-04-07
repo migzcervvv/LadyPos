@@ -132,13 +132,6 @@ export async function updateOrder(req, res) {
 
     const { paymentStatus, orderStatus, personId } = req.body;
 
-    // 🔒 NON-ADMIN cannot modify completed orders
-    if (wasCompleted && !isAdmin) {
-      return res.status(403).json({
-        error: "Only admins can modify completed orders",
-      });
-    }
-
     // ❌ Prevent reverting completed → pending
     if (wasCompleted && orderStatus === "pending") {
       return res.status(400).json({

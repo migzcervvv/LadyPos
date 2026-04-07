@@ -249,28 +249,19 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
                 </button>
               ) : (
                 <>
-                  {/* ADMIN */}
-                  {isAdmin ? (
-                    <>
-                      <button
-                        onClick={() => completeOrder("paid")}
-                        className="w-full py-3 bg-green-600 text-white rounded"
-                      >
-                        ✅ Complete (Paid)
-                      </button>
+                  <button
+                    onClick={() => completeOrder("paid")}
+                    className="w-full py-3 bg-green-600 text-white rounded"
+                  >
+                    ✅ Complete (Paid)
+                  </button>
 
-                      <button
-                        onClick={() => completeOrder("debt")}
-                        className="w-full py-3 bg-orange-500 text-white rounded"
-                      >
-                        💳 Complete as Debt
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-center text-sm text-gray-500">
-                      Only admin can complete orders
-                    </div>
-                  )}
+                  <button
+                    onClick={() => completeOrder("debt")}
+                    className="w-full py-3 bg-orange-500 text-white rounded"
+                  >
+                    💳 Complete as Debt
+                  </button>
                 </>
               )}
 
