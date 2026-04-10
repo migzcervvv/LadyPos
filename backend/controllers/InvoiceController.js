@@ -6,7 +6,7 @@ import InvoiceCounter from "../models/InvoiceCounter.js";
 // Generate invoice number (per user)
 const generateInvoiceNumber = async (userId) => {
   const year = new Date().getFullYear();
-
+  console.log("Generating invoice number for user:", userId, "Year:", year);
   const counter = await InvoiceCounter.findOneAndUpdate(
     { userId, year },
     { $inc: { seq: 1 } }, // ✅ ONLY this

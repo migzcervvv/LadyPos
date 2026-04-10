@@ -9,7 +9,7 @@ import { useAuth } from "../../../shared/hooks/AuthContext";
 export default function UpdateOrderModal({ order, onClose, onSuccess }) {
   const { getProducts } = useProductApi();
   const { getPersons } = usePersonApi();
-  const { updateOrder } = useOrderApi();
+  const { updateOrder, deleteOrder } = useOrderApi();
   const { ensureInvoice } = useInvoiceApi();
   const { user } = useAuth();
 
@@ -18,9 +18,12 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [personId, setPersonId] = useState("");
   const [invoice, setInvoice] = useState(null);
+  const [notes, setNotes] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const isCompleted = order?.orderStatus?.toLowerCase() === "completed";
+  const canDelete = user?.id === order?.userId || isAdmin;
 
   // 🔹 LOAD DATA
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
 
     if (order) {
       setPersonId(order.personId?._id || order.personId || "");
+      setNotes(order.notes || "");
 
       const mapped = order.products.map((p) => ({
         productId:
@@ -48,9 +52,7 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
 
   useEffect(() => {
     if (invoice) {
-      setTimeout(() => {
-        window.print();
-      }, 100);
+      setTimeout(() => window.print(), 100);
     }
   }, [invoice]);
 
@@ -97,17 +99,19 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
     (acc, p) => acc + p.quantity * p.price,
     0,
   );
-  const handlePrintInvoice = async () => {
-    try {
-      const res = await ensureInvoice(order._id);
 
-      setInvoice(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate invoice");
-    }
+  // 🔹 SAVE (PRIMARY ACTION)
+  const handleSave = async () => {
+    await updateOrder(order._id, {
+      products: selectedProducts,
+      personId: personId || null,
+      notes,
+    });
+
+    onSuccess();
   };
-  // 🔹 COMPLETE ORDER
+
+  // 🔹 COMPLETE (FROM MENU)
   const completeOrder = async (paymentType) => {
     if (paymentType === "debt" && !personId) {
       return alert("Debt requires customer");
@@ -117,151 +121,227 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
       orderStatus: "completed",
       paymentStatus: paymentType,
       personId: personId || null,
+      notes,
     });
 
-    // 🔥 ALWAYS ensure invoice after completion
     const res = await ensureInvoice(order._id);
     setInvoice(res.data);
 
     onSuccess();
   };
+
+  // 🔹 DELETE
+  const handleDelete = async () => {
+    if (!window.confirm("Delete this order?")) return;
+
+    try {
+      await deleteOrder(order._id);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.error || "Delete failed");
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    try {
+      const res = await ensureInvoice(order._id);
+      setInvoice(res.data);
+    } catch {
+      alert("Failed to generate invoice");
+    }
+  };
+
   return (
     <>
-      {/* 🔥 PRINT AREA (VERY IMPORTANT) */}
+      {/* PRINT */}
       {invoice && (
         <div style={{ position: "absolute", top: "-9999px" }}>
           <Invoice invoice={invoice} />
         </div>
       )}
-      {/* 🔥 MODAL */}
+
+      {/* MODAL */}
       <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
-        <div
-          className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col"
-          style={{
-            backgroundColor: "var(--color-surface)",
-            color: "var(--color-text)",
-          }}
-        >
+        <div className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col bg-[var(--color-surface)]">
           {/* HEADER */}
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-bold">Update Order</h2>
-            <button onClick={onClose}>✕</button>
+            <h2 className="text-lg font-bold">Order</h2>
+
+            <div className="flex items-center gap-2 relative">
+              <button onClick={onClose}>✕</button>
+
+              <button onClick={() => setShowMenu((p) => !p)}>⋯</button>
+
+              {showMenu && (
+                <div className="absolute right-0 top-8 w-44 bg-white border rounded shadow z-10 text-sm">
+                  {!isCompleted && (
+                    <>
+                      <button
+                        onClick={() => completeOrder("paid")}
+                        className="block w-full text-left p-2 hover:bg-gray-100"
+                      >
+                        ✅ Mark Paid
+                      </button>
+
+                      <button
+                        onClick={() => completeOrder("debt")}
+                        className="block w-full text-left p-2 hover:bg-gray-100"
+                      >
+                        💳 Mark Debt
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={handlePrintInvoice}
+                    className="block w-full text-left p-2 hover:bg-gray-100"
+                  >
+                    🧾 Print
+                  </button>
+
+                  {canDelete && (
+                    <button
+                      onClick={handleDelete}
+                      className="block w-full text-left p-2 text-red-500 hover:bg-gray-100"
+                    >
+                      🗑 Delete
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* LOCK MESSAGE */}
+          {/* LOCK */}
           {isCompleted && !isAdmin && (
             <div className="mb-3 p-2 rounded bg-gray-200 text-center text-sm">
-              🔒 Completed order (read-only)
+              🔒 Read-only
             </div>
           )}
 
           {/* CONTENT */}
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto space-y-3">
             {/* CUSTOMER */}
-            <div className="mb-3">
-              <label className="text-sm">Customer</label>
-              <select
-                disabled={!isAdmin && isCompleted}
-                value={personId}
-                onChange={(e) => setPersonId(e.target.value)}
-                className="w-full p-3 border rounded"
-              >
-                <option value="">Walk-in</option>
-                {persons.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              disabled={!isAdmin && isCompleted}
+              value={personId}
+              onChange={(e) => setPersonId(e.target.value)}
+              className="w-full p-3 border rounded"
+            >
+              <option value="">Walk-in</option>
+              {persons.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+
+            {/* NOTES */}
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={!isAdmin && isCompleted}
+              placeholder="Order instructions..."
+              className="w-full p-3 border rounded"
+            />
 
             {/* PRODUCTS */}
-            <div className="mb-3">
-              <p className="text-sm font-semibold">Products</p>
-              <div className="flex gap-2 overflow-x-auto">
-                {products.map((p) => (
-                  <button
-                    key={p._id}
-                    disabled={!isAdmin && isCompleted}
-                    onClick={() => addProduct(p)}
-                    className="p-2 border rounded"
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {products.map((p) => (
+                <button
+                  key={p._id}
+                  onClick={() => addProduct(p)}
+                  disabled={!isAdmin && isCompleted}
+                  className="px-3 py-2 border rounded whitespace-nowrap"
+                >
+                  {p.name}
+                </button>
+              ))}
             </div>
 
             {/* ITEMS */}
-            <div className="mb-4 space-y-2">
-              {selectedProducts.map((p) => (
-                <div
-                  key={p.productId}
-                  className="flex justify-between items-center border p-2 rounded"
-                >
-                  <div>
-                    <p>{p.name}</p>
-                    <p className="text-xs">₱ {p.price}</p>
-                  </div>
-
-                  <div className="flex gap-2 items-center">
-                    <button
-                      disabled={!isAdmin && isCompleted}
-                      onClick={() => updateQty(p.productId, p.quantity - 1)}
-                    >
-                      -
-                    </button>
-
-                    <span>{p.quantity}</span>
-
-                    <button
-                      disabled={!isAdmin && isCompleted}
-                      onClick={() => updateQty(p.productId, p.quantity + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
+            {selectedProducts.map((p) => (
+              <div
+                key={p.productId}
+                className="flex justify-between items-center border p-2 rounded"
+              >
+                <div>
+                  <p>{p.name}</p>
+                  <p className="text-xs">₱ {p.price}</p>
                 </div>
-              ))}
-            </div>
+
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => updateQty(p.productId, p.quantity - 1)}
+                  >
+                    -
+                  </button>
+                  <span>{p.quantity}</span>
+                  <button
+                    onClick={() => updateQty(p.productId, p.quantity + 1)}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* FOOTER */}
-          <div className="pt-3 border-t">
-            <div className="flex justify-between mb-2">
+          {/* FOOTER (STICKY) */}
+          <div className="sticky bottom-0 bg-[var(--color-surface)] pt-3 border-t space-y-2">
+            {/* TOTAL */}
+            <div className="flex justify-between">
               <span>Total</span>
               <span className="font-bold">₱ {total}</span>
             </div>
-            <div className="flex flex-col gap-2">
-              {/* ✅ COMPLETED → PRINT ONLY */}
-              {isCompleted ? (
-                <button
-                  onClick={handlePrintInvoice}
-                  className="w-full py-3 rounded text-white bg-black"
-                >
-                  🧾 Print Invoice
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => completeOrder("paid")}
-                    className="w-full py-3 bg-green-600 text-white rounded"
-                  >
-                    ✅ Complete (Paid)
-                  </button>
 
-                  <button
-                    onClick={() => completeOrder("debt")}
-                    className="w-full py-3 bg-orange-500 text-white rounded"
-                  >
-                    💳 Complete as Debt
-                  </button>
-                </>
-              )}
-
-              <button onClick={onClose} className="border py-2 rounded">
-                Cancel
+            {/* PRIMARY */}
+            {!isCompleted && (
+              <button
+                onClick={handleSave}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg"
+              >
+                💾 Save
               </button>
+            )}
+
+            {/* CONTEXTUAL (only if not completed) */}
+            {!isCompleted && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => completeOrder("paid")}
+                  className="py-2 bg-green-600 text-white rounded-lg"
+                >
+                  ✅ Paid
+                </button>
+
+                <button
+                  onClick={() => completeOrder("debt")}
+                  className="py-2 bg-orange-500 text-white rounded-lg"
+                >
+                  💰 Debt
+                </button>
+              </div>
+            )}
+
+            {/* SECONDARY */}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrintInvoice}
+                className="flex-1 py-2 border rounded"
+              >
+                🧾 Print
+              </button>
+
+              {canDelete && (
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 py-2 border border-red-500 text-red-500 rounded"
+                >
+                  🗑 Delete
+                </button>
+              )}
             </div>
           </div>
         </div>

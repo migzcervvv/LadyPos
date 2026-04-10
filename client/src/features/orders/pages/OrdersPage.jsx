@@ -179,7 +179,7 @@ export default function OrdersPage() {
               <div
                 key={order._id}
                 onClick={() => setSelectedOrder(order)}
-                className="p-4 rounded-xl shadow cursor-pointer"
+                className="p-3 rounded-xl shadow cursor-pointer flex flex-col gap-2"
                 style={{
                   backgroundColor: "var(--color-surface)",
                   border: `1px solid ${
@@ -191,13 +191,26 @@ export default function OrdersPage() {
                   }`,
                 }}
               >
-                <p className="font-bold">₱ {order.total}</p>
-                <p className="text-sm">{order.products.length} items</p>
+                {/* TOP ROW */}
+                <div className="flex justify-between items-center">
+                  <p className="font-bold text-lg">₱ {order.total}</p>
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--color-muted)" }}
+                  >
+                    {formatDateTime(order.createdAt)}
+                  </p>
+                </div>
 
-                <p className="text-sm">
-                  Customer: {order.personId?.name || "Walk-in"}
-                </p>
-                <div className="flex gap-2 mt-1 flex-wrap">
+                {/* CUSTOMER */}
+                <div className="text-sm">
+                  <span className="font-medium">
+                    {order.personId?.name || "Walk-in"}
+                  </span>
+                </div>
+
+                {/* META TAGS */}
+                <div className="flex flex-wrap gap-1">
                   <span className="text-xs px-2 py-1 rounded bg-gray-200">
                     {order.customerType} {order.reference || ""}
                   </span>
@@ -209,12 +222,20 @@ export default function OrdersPage() {
                         : "bg-green-200"
                     }`}
                   >
-                    {order.orderStatus} - {order.paymentStatus}
+                    {order.orderStatus} • {order.paymentStatus}
+                  </span>
+
+                  <span className="text-xs px-2 py-1 rounded bg-blue-100">
+                    {order.products.length} items
                   </span>
                 </div>
-                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-                  {formatDateTime(order.createdAt)}
-                </p>
+
+                {/* NOTES */}
+                {order.notes && (
+                  <div className="p-2 rounded bg-yellow-50 border text-xs line-clamp-2">
+                    <span className="font-medium">Note:</span> {order.notes}
+                  </div>
+                )}
               </div>
             ))}
           </div>

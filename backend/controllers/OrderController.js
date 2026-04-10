@@ -156,7 +156,7 @@ export async function updateOrder(req, res) {
 
     const wasCompleted = order.orderStatus === "completed";
 
-    const { paymentStatus, orderStatus, personId } = req.body;
+    const { paymentStatus, orderStatus, personId, notes } = req.body;
 
     // ❌ prevent reverting
     if (wasCompleted && orderStatus === "pending") {
@@ -171,7 +171,7 @@ export async function updateOrder(req, res) {
 
     if (paymentStatus) order.paymentStatus = paymentStatus;
     if (orderStatus) order.orderStatus = orderStatus.toLowerCase();
-
+    if (notes) order.notes = notes;
     //
     // 🔥 HANDLE COMPLETION (ONLY ONCE)
     //

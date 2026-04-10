@@ -15,6 +15,7 @@ export default function POSPage() {
   const [reference, setReference] = useState("");
   const [cart, setCart] = useState([]);
   const [personId, setPersonId] = useState("");
+  const [orderInstructions, setOrderInstructions] = useState("");
   const navigate = useNavigate();
   // LOAD DATA
   useEffect(() => {
@@ -70,11 +71,13 @@ export default function POSPage() {
         reference: ["grab", "foodpanda"].includes(customerType)
           ? reference
           : null,
+        notes: orderInstructions, // ✅ add this
       });
 
       // reset
       setCart([]);
       setPersonId("");
+      setOrderInstructions("");
     } catch (err) {
       console.error(err);
     }
@@ -213,7 +216,19 @@ export default function POSPage() {
               />
             )}
           </div>
-
+          {/* ORDER INSTRUCTIONS */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium mb-1">
+              Order instructions
+            </label>
+            <textarea
+              value={orderInstructions}
+              onChange={(e) => setOrderInstructions(e.target.value)}
+              placeholder="Add notes for this order..."
+              className="w-full p-2 border rounded"
+              rows={2}
+            />
+          </div>
           {/* CART ITEMS */}
           <div
             className="flex-1 overflow-y-auto mb-4"
