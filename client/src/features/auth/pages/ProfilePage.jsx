@@ -13,7 +13,7 @@ export default function ProfilePage() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
+  const [formErrors, setFormErrors] = useState({});
   const [editingIdentifier, setEditingIdentifier] = useState(false);
   const [identifierValue, setIdentifierValue] = useState(user.identifier);
   const [profile, setProfile] = useState({
@@ -56,6 +56,30 @@ export default function ProfilePage() {
     setIdentifierValue(user.identifier);
   }, [user]);
 
+  const validateUser = (u, isEdit = false) => {
+    const errors = {};
+
+    if (!u.identifier || u.identifier.trim().length < 3) {
+      errors.identifier = "Identifier must be at least 3 characters";
+    }
+
+    if (!isEdit && (!u.password || u.password.length < 6)) {
+      errors.password = "Password must be at least 6 characters";
+    }
+
+    // 🔥 REQUIRED PHONE ON CREATE
+    if (!u.phone || u.phone.trim() === "") {
+      errors.phone = "Phone number is required";
+    } else {
+      const normalized = normalizePHPhone(u.phone);
+      if (!isValidPHPhone(normalized)) {
+        errors.phone = "Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)";
+      }
+    }
+
+    return errors;
+  };
+
   // =========================
   // DELETE USER
   // =========================
@@ -73,14 +97,26 @@ export default function ProfilePage() {
   // =========================
   const handleSaveUser = async (u) => {
     try {
+      const isEdit = !!u._id;
+
+      const errors = validateUser(u, isEdit);
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        return;
+      }
+
+      setFormErrors({});
+
       let data;
 
+      const normalizedPhone = normalizePHPhone(u.phone);
+
       const payload = {
-        identifier: u.identifier,
+        identifier: u.identifier.toLowerCase(),
         role: u.role,
         confirmed: u.confirmed,
         name: u.name ?? null,
-        phone: u.phone ?? null,
+        phone: normalizedPhone,
         address: u.address ?? null,
       };
 
@@ -94,14 +130,19 @@ export default function ProfilePage() {
           prev.map((user) => (user._id === data._id ? data : user)),
         );
       } else {
-        console.log("Creating user with payload:", payload);
         data = await registerUser(payload, jwt);
         setUsers((prev) => [...prev, data]);
       }
 
       setShowModal(false);
     } catch (err) {
-      console.error("Save failed", err);
+      console.error("Save failed", err.response?.data || err.message);
+
+      setFormErrors({
+        general:
+          err.response?.data?.message ||
+          "Something went wrong. Please try again.",
+      });
     }
   };
 
@@ -154,12 +195,26 @@ export default function ProfilePage() {
 
   const handleProfileSave = async () => {
     try {
-      const normalizedPhone = normalizePHPhone(profile.phone);
+      const errors = {};
 
-      if (normalizedPhone && !isValidPHPhone(normalizedPhone)) {
-        alert("Invalid PH mobile number. Use 09XXXXXXXXX or +639XXXXXXXXX");
+      if (!profile.phone || profile.phone.trim() === "") {
+        errors.phone = "Phone number is required";
+      } else {
+        const normalizedPhone = normalizePHPhone(profile.phone);
+        if (!isValidPHPhone(normalizedPhone)) {
+          errors.phone =
+            "Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)";
+        }
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
         return;
       }
+
+      setFormErrors({});
+
+      const normalizedPhone = normalizePHPhone(profile.phone);
 
       await editUser(
         {
@@ -171,7 +226,6 @@ export default function ProfilePage() {
         jwt,
       );
 
-      // update local state so UI reflects immediately
       setProfile((prev) => ({
         ...prev,
         name: profile.name,
@@ -182,6 +236,10 @@ export default function ProfilePage() {
       setEditingProfile(false);
     } catch (err) {
       console.error("Failed to update profile:", err);
+
+      setFormErrors({
+        general: "Failed to update profile. Try again.",
+      });
     }
   };
   return (
@@ -231,7 +289,9 @@ export default function ProfilePage() {
                   setProfile({ ...profile, phone: e.target.value })
                 }
               />
-
+              {formErrors.phone && (
+                <p className="text-red-500 text-sm">{formErrors.phone}</p>
+              )}
               <input
                 className="input"
                 placeholder="Address"
@@ -384,6 +444,7 @@ export default function ProfilePage() {
                 password: "",
                 role: "user",
                 confirmed: false,
+                phone: "",
               });
               setShowModal(true);
             }}
@@ -447,9 +508,13 @@ export default function ProfilePage() {
             <h2 className="text-xl font-bold mb-4">
               {selectedUser._id ? "Edit User" : "Create User"}
             </h2>
-
+            {formErrors.general && (
+              <div className="bg-red-100 text-red-700 p-2 rounded mb-3 text-sm">
+                {formErrors.general}
+              </div>
+            )}
             <input
-              className="w-full mb-3 p-2 border rounded"
+              className="w-full mb-1 p-2 border rounded"
               placeholder="Identifier"
               value={selectedUser.identifier}
               onChange={(e) =>
@@ -459,9 +524,14 @@ export default function ProfilePage() {
                 })
               }
             />
+            {formErrors.identifier && (
+              <p className="text-red-500 text-sm mb-2">
+                {formErrors.identifier}
+              </p>
+            )}
 
             <input
-              className="w-full mb-3 p-2 border rounded"
+              className="w-full mb-1 p-2 border rounded"
               type="password"
               placeholder="Password"
               onChange={(e) =>
@@ -471,7 +541,25 @@ export default function ProfilePage() {
                 })
               }
             />
-
+            {formErrors.password && (
+              <p className="text-red-500 text-sm mb-2">{formErrors.password}</p>
+            )}
+            <input
+              className="w-full mb-1 p-2 border rounded"
+              placeholder="Phone number"
+              maxLength={13}
+              inputMode="numeric"
+              value={selectedUser.phone || ""} // ✅ ADD THIS
+              onChange={(e) =>
+                setSelectedUser({
+                  ...selectedUser,
+                  phone: e.target.value,
+                })
+              }
+            />
+            {formErrors.phone && (
+              <p className="text-red-500 text-sm mb-2">{formErrors.phone}</p>
+            )}
             <select
               className="w-full mb-3 p-2 border rounded"
               value={selectedUser.role}

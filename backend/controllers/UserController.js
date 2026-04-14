@@ -25,7 +25,7 @@ export async function createUser(req, res) {
       role: "user", // default role
       confirmed: false, // default confirmation status
       name: null,
-      phone: null,
+      phone: req.body.phone,
       address: null,
     });
 
@@ -36,7 +36,7 @@ export async function createUser(req, res) {
       token: await generateToken(user),
       confirmed: user.confirmed,
       name: null,
-      phone: null,
+      phone: req.body.phone,
       address: null,
     });
   } catch (err) {
