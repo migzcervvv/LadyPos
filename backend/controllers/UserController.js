@@ -24,6 +24,9 @@ export async function createUser(req, res) {
       password: hashedPassword,
       role: "user", // default role
       confirmed: false, // default confirmation status
+      name: null,
+      phone: null,
+      address: null,
     });
 
     res.status(201).json({
@@ -32,6 +35,9 @@ export async function createUser(req, res) {
       role: user.role,
       token: await generateToken(user),
       confirmed: user.confirmed,
+      name: null,
+      phone: null,
+      address: null,
     });
   } catch (err) {
     console.error("Registration error:", err);

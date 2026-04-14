@@ -79,9 +79,9 @@ export default function ProfilePage() {
         identifier: u.identifier,
         role: u.role,
         confirmed: u.confirmed,
-        name: u.name,
-        phone: u.phone,
-        address: u.address,
+        name: u.name ?? null,
+        phone: u.phone ?? null,
+        address: u.address ?? null,
       };
 
       if (u.password) {
@@ -94,6 +94,7 @@ export default function ProfilePage() {
           prev.map((user) => (user._id === data._id ? data : user)),
         );
       } else {
+        console.log("Creating user with payload:", payload);
         data = await registerUser(payload, jwt);
         setUsers((prev) => [...prev, data]);
       }
