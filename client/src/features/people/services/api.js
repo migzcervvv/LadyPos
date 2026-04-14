@@ -7,6 +7,10 @@ export function usePersonApi() {
 
   const createPerson = (data) => api.post("/people", data);
 
+  const updatePerson = (personId, data) => api.put(`/people/${personId}`, data);
+
+  const deletePerson = (personId) => api.delete(`/people/${personId}`);
+
   const getPersonById = (id) => api.get(`/people/${id}`);
 
   const addDebt = (personId, data) =>
@@ -26,6 +30,8 @@ export function usePersonApi() {
   return {
     getPersons,
     createPerson,
+    updatePerson,
+    deletePerson,
     getPersonById,
     addDebt,
     addPayment,

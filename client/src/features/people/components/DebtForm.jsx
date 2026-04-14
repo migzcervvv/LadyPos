@@ -2,22 +2,51 @@ import { useState } from "react";
 
 export default function DebtForm({ onSubmit, isPayment }) {
   const [form, setForm] = useState({ amount: "", notes: "" });
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const amount = parseFloat(form.amount);
+
+    // 🔴 HARD GUARDS (you were missing this)
+    if (!amount || isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await onSubmit({
+        amount,
+        notes: form.notes?.trim(),
+      });
+
+      // ✅ Reset after success
+      setForm({ amount: "", notes: "" });
+    } catch (err) {
+      console.error("Submit failed:", err);
+      alert("Something went wrong while saving");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({ ...form, amount: parseFloat(form.amount) });
-        setForm({ amount: "", notes: "" });
-      }}
+      onSubmit={handleSubmit}
       className="bg-gray-50 border rounded-xl p-3 space-y-2"
     >
       <input
         name="amount"
         type="number"
+        step="0.01"
+        min="0"
         placeholder={isPayment ? "Enter payment amount" : "Enter debt amount"}
         value={form.amount}
         onChange={handleChange}
@@ -34,11 +63,13 @@ export default function DebtForm({ onSubmit, isPayment }) {
       />
 
       <button
-        className={`w-full py-2 rounded-xl text-white text-sm ${
+        type="submit"
+        disabled={loading}
+        className={`w-full py-2 rounded-xl text-white text-sm transition ${
           isPayment ? "bg-blue-500" : "bg-green-500"
-        }`}
+        } ${loading ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
       >
-        {isPayment ? "Confirm Payment" : "Add Debt"}
+        {loading ? "Saving..." : isPayment ? "Confirm Payment" : "Add Debt"}
       </button>
     </form>
   );

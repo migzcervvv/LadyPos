@@ -58,7 +58,7 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
   console.log("Server started");
   console.warn("This is a warning");
-  console.error("Something broke");
+  console.error("This means something broke");
   res.send(`
     <html>
     <head>

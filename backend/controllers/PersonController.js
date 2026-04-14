@@ -115,6 +115,10 @@ export async function deletePerson(req, res) {
 
 export async function addDebt(req, res) {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const person = await Person.findOne({
       _id: req.params.id,
       userId: req.user.id,
@@ -124,34 +128,39 @@ export async function addDebt(req, res) {
       return res.status(404).json({ error: "Person not found" });
     }
 
-    const { amount, notes } = req.body;
+    const amount = Number(req.body.amount);
+    const notes = req.body.notes || "";
 
-    // ✅ Validation
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    person.debts.push({
+    const newDebt = {
       kind: "charge",
       context: "debt",
-      amount: Number(amount),
-      notes: notes?.trim() || "",
+      amount,
+      notes,
       paymentMethod: "Cash",
-      // date auto-handled by schema
-    });
+      date: new Date(),
+    };
+
+    person.debts.push(newDebt);
 
     await person.save();
 
-    // ✅ return updated person (important for UI)
     res.json(person);
   } catch (err) {
-    console.error("ADD DEBT ERROR:", err);
+    console.error("ADD DEBT ERROR FULL:", err);
     res.status(500).json({ error: err.message });
   }
 }
 
 export async function addPayment(req, res) {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const person = await Person.findOne({
       _id: req.params.id,
       userId: req.user.id,
@@ -161,26 +170,29 @@ export async function addPayment(req, res) {
       return res.status(404).json({ error: "Person not found" });
     }
 
-    const { amount, notes } = req.body;
+    const amount = Number(req.body.amount);
+    const notes = req.body.notes || "";
 
-    // ✅ Validation
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    person.debts.push({
+    const newPayment = {
       kind: "payment",
       context: "debt",
-      amount: Number(amount),
-      notes: notes?.trim() || "",
+      amount,
+      notes,
       paymentMethod: "Cash",
-    });
+      date: new Date(),
+    };
+
+    person.debts.push(newPayment);
 
     await person.save();
 
     res.json(person);
   } catch (err) {
-    console.error("ADD PAYMENT ERROR:", err);
+    console.error("FULL ERROR:", err); // 🔥 THIS will finally show truth
     res.status(500).json({ error: err.message });
   }
 }
