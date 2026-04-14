@@ -16,68 +16,111 @@ dotenv.config();
 const app = express();
 app.use(logger);
 
-const logs = [];
+// Logging middleware to capture all incoming requests
 
-function addLog(message) {
+const logs = [];
+const clients = [];
+
+function pushLog(level, message) {
   const time = new Date().toLocaleTimeString();
-  const log = `[${time}] ${message}`;
+
+  const log = {
+    time,
+    level,
+    message,
+  };
 
   logs.push(log);
+  if (logs.length > 300) logs.shift();
 
-  // prevent memory explosion
-  if (logs.length > 200) logs.shift();
+  // send to all connected clients (SSE)
+  clients.forEach((res) => {
+    res.write(`data: ${JSON.stringify(log)}\n\n`);
+  });
 
-  console._log(log);
+  // still log to console
+  console._log(`[${time}] [${level.toUpperCase()}] ${message}`);
 }
 
-// preserve original
+// preserve originals
 console._log = console.log;
-console.log = addLog;
+
+console.log = (msg) => pushLog("info", msg);
+console.warn = (msg) => pushLog("warn", msg);
+console.error = (msg) => pushLog("error", msg);
+// Logging middleware to capture all incoming requests
+
 app.use((req, res, next) => {
   console.log(`Incoming ${req.method} ${req.url}`);
   next();
 });
 
 app.get("/", (req, res) => {
+  console.log("Server started");
+  console.warn("This is a warning");
+  console.error("Something broke");
   res.send(`
     <html>
     <head>
-      <title>Server Logs</title>
-      <meta http-equiv="refresh" content="2">
+      <title>Live Logs</title>
       <style>
         body {
           background: #0d0d0d;
-          color: #00ff9c;
+          color: #eaeaea;
           font-family: monospace;
           padding: 20px;
         }
+
+        h2 {
+          color: #00ff9c;
+        }
+
         .log {
           margin: 4px 0;
-          white-space: pre;
+        }
+
+        .time {
+          color: #888;
+          margin-right: 10px;
+        }
+
+        .info { color: #00ff9c; }
+        .warn { color: #ffcc00; }
+        .error { color: #ff4d4d; }
+
+        #logs {
+          max-height: 90vh;
+          overflow-y: auto;
         }
       </style>
     </head>
     <body>
       <h2>🚀 Live Server Logs</h2>
-      ${logs.map((l) => `<div class="log">${l}</div>`).join("")}
+      <div id="logs"></div>
+
+      <script>
+        const logContainer = document.getElementById("logs");
+
+        const evtSource = new EventSource("/logs-stream");
+
+        evtSource.onmessage = function(event) {
+          const log = JSON.parse(event.data);
+
+          const div = document.createElement("div");
+          div.className = "log " + log.level;
+
+          div.innerHTML =
+            '<span class="time">[' + log.time + ']</span>' +
+            '<span>[' + log.level.toUpperCase() + ']</span> ' +
+            log.message;
+
+          logContainer.appendChild(div);
+
+          // auto-scroll
+          logContainer.scrollTop = logContainer.scrollHeight;
+        };
+      </script>
     </body>
-    <script>
-      setInterval(() => {
-        fetch("/")
-          .then(res => res.text())
-          .then(html => {
-            document.body.innerHTML = html;
-          });
-      }, 2000);
-    </script>
-    <script>
-      const evtSource = new EventSource('/logs-stream');
-      evtSource.onmessage = function(event) {
-        const div = document.createElement("div");
-        div.textContent = event.data;
-        document.body.appendChild(div);
-      };
-    </script>
     </html>
   `);
 });
@@ -87,14 +130,17 @@ app.get("/logs-stream", (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  const interval = setInterval(() => {
-    const lastLog = logs[logs.length - 1];
-    if (lastLog) {
-      res.write(`data: ${lastLog}\n\n`);
-    }
-  }, 1000);
+  // send existing logs first
+  logs.forEach((log) => {
+    res.write(`data: ${JSON.stringify(log)}\n\n`);
+  });
 
-  req.on("close", () => clearInterval(interval));
+  clients.push(res);
+
+  req.on("close", () => {
+    const index = clients.indexOf(res);
+    if (index !== -1) clients.splice(index, 1);
+  });
 });
 
 const allowedOrigins = [
