@@ -120,23 +120,32 @@ export async function addDebt(req, res) {
       userId: req.user.id,
     });
 
-    if (!person) return res.status(404).json({ error: "Person not found" });
+    if (!person) {
+      return res.status(404).json({ error: "Person not found" });
+    }
 
     const { amount, notes } = req.body;
+
+    // ✅ Validation
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
 
     person.debts.push({
       kind: "charge",
       context: "debt",
-      amount,
-      notes,
+      amount: Number(amount),
+      notes: notes?.trim() || "",
       paymentMethod: "Cash",
-      date: new Date(),
+      // date auto-handled by schema
     });
 
     await person.save();
 
-    res.json({ message: "Debt added" });
+    // ✅ return updated person (important for UI)
+    res.json(person);
   } catch (err) {
+    console.error("ADD DEBT ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 }
@@ -148,23 +157,30 @@ export async function addPayment(req, res) {
       userId: req.user.id,
     });
 
-    if (!person) return res.status(404).json({ error: "Person not found" });
+    if (!person) {
+      return res.status(404).json({ error: "Person not found" });
+    }
 
     const { amount, notes } = req.body;
+
+    // ✅ Validation
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
 
     person.debts.push({
       kind: "payment",
       context: "debt",
-      amount,
-      notes,
+      amount: Number(amount),
+      notes: notes?.trim() || "",
       paymentMethod: "Cash",
-      date: new Date(),
     });
 
     await person.save();
 
-    res.json({ message: "Payment recorded" });
+    res.json(person);
   } catch (err) {
+    console.error("ADD PAYMENT ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 }
