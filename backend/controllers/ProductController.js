@@ -1,4 +1,4 @@
-import Product from '../models/Product.js';
+import Product from "../models/Product.js";
 
 //
 // Helper: safely get userId from JWT
@@ -17,11 +17,12 @@ export async function createProduct(req, res, next) {
     const product = await Product.create({
       userId,
       name: req.body.name,
-      category: req.body.category || 'General',
+      category: req.body.category || "General",
       sellingPrice: req.body.sellingPrice,
       costPrice: req.body.costPrice,
       quantity: req.body.quantity ?? 0,
       paidStatus: req.body.paidStatus ?? false,
+      active: true,
     });
 
     res.status(201).json(product);
@@ -37,8 +38,7 @@ export async function getProducts(req, res, next) {
   try {
     const userId = getUserId(req);
 
-    const products = await Product.find({ userId })
-      .sort({ createdAt: -1 });
+    const products = await Product.find({ userId }).sort({ createdAt: -1 });
 
     res.json(products);
   } catch (err) {
@@ -59,7 +59,7 @@ export async function getProductById(req, res, next) {
     });
 
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: "Product not found" });
     }
 
     res.json(product);
@@ -67,6 +67,39 @@ export async function getProductById(req, res, next) {
     next(err);
   }
 }
+
+export const setActiveProducts = async (req, res) => {
+  try {
+    const { productIds } = req.body;
+    const userId = req.user.id;
+
+    if (!Array.isArray(productIds)) {
+      return res.status(400).json({
+        message: "productIds must be an array",
+      });
+    }
+
+    // 1. Set ALL products to inactive
+    await Product.updateMany({ userId }, { $set: { active: false } });
+
+    // 2. Activate selected products
+    if (productIds.length > 0) {
+      await Product.updateMany(
+        { _id: { $in: productIds }, userId },
+        { $set: { active: true } },
+      );
+    }
+
+    res.json({
+      message: "Active products updated successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to update active products",
+    });
+  }
+};
 
 //
 // UPDATE PRODUCT
@@ -87,15 +120,16 @@ export async function updateProduct(req, res, next) {
         costPrice: req.body.costPrice,
         quantity: req.body.quantity,
         paidStatus: req.body.paidStatus,
+        active: req.body.active,
       },
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: "Product not found" });
     }
 
     res.json(product);
@@ -117,10 +151,10 @@ export async function deleteProduct(req, res, next) {
     });
 
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json({ message: 'Product deleted' });
+    res.json({ message: "Product deleted" });
   } catch (err) {
     next(err);
   }

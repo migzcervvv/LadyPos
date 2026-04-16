@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProductApi } from "../../products/services/productApi";
 import { usePersonApi } from "../../people/services/api";
 import { useOrderApi } from "../services/ordersApi";
@@ -22,8 +22,9 @@ export default function POSPage() {
     getProducts().then((res) => setProducts(res.data));
     getPersons().then((res) => setPersons(res.data));
   }, []);
-
-  // 🧠 ADD TO CART (core logic)
+  const activeProducts = useMemo(() => {
+    return products.filter((p) => p.active);
+  }, [products]); // 🧠 ADD TO CART (core logic)
   const addToCart = (product) => {
     setCart((prev) => {
       const exists = prev.find((p) => p.productId === product._id);
@@ -103,7 +104,7 @@ export default function POSPage() {
             View Orders
           </button>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {products.map((p) => (
+            {activeProducts.map((p) => (
               <button
                 key={p._id}
                 onClick={() => addToCart(p)}

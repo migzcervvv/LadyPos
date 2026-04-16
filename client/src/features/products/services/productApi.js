@@ -27,11 +27,17 @@ export function useProductApi() {
     return res;
   };
 
+  const setActiveProducts = async (productIds) => {
+    const res = await api.post("/products/set-active", { productIds });
+    return res;
+  };
+
   return {
     getProducts,
     createProduct,
     getProductById,
     updateProduct,
     deleteProduct,
+    setActiveProducts,
   };
 }

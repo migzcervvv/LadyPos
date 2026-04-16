@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useProductApi } from "../services/productApi";
 import ProductCard from "../components/ProductCard";
 import ProductFormModal from "../components/ProductFormModal";
+import ActiveProductsModal from "../components/ActiveProductsModal";
 
 export default function ProductPage() {
   const { getProducts, deleteProduct } = useProductApi();
@@ -10,7 +11,7 @@ export default function ProductPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-
+  const [showActiveModal, setShowActiveModal] = useState(false);
   async function loadProducts() {
     const res = await getProducts();
     setProducts(res.data);
@@ -21,15 +22,22 @@ export default function ProductPage() {
   }, []);
 
   const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
     <div className="p-4 pb-24 max-w-5xl mx-auto">
-
       {/* Header */}
-      <h1 className="text-2xl font-semibold mb-4">Products</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-semibold">Products</h1>
 
+        <button
+          onClick={() => setShowActiveModal(true)}
+          className="px-4 py-2 bg-gray-800 text-white rounded-lg"
+        >
+          Set Active (POS)
+        </button>
+      </div>
       {/* Search */}
       <input
         className="w-full p-3 rounded-xl border mb-4"
@@ -85,6 +93,16 @@ export default function ProductPage() {
           onSuccess={() => {
             setShowModal(false);
             loadProducts();
+          }}
+        />
+      )}
+
+      {showActiveModal && (
+        <ActiveProductsModal
+          onClose={() => setShowActiveModal(false)}
+          onSuccess={() => {
+            setShowActiveModal(false);
+            loadProducts(); // refresh list
           }}
         />
       )}
