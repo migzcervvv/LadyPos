@@ -8,8 +8,7 @@ import {
 } from "../../auth/api/authApi";
 
 export default function ProfilePage() {
-  const { user, jwt } = useAuth();
-
+  const { user, jwt, setUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -151,7 +150,16 @@ export default function ProfilePage() {
   // =========================
   const handleIdentifierSave = async () => {
     try {
-      await editUser({ _id: user._id, identifier: identifierValue }, jwt);
+      const updatedUser = await editUser(
+        { _id: user._id, identifier: identifierValue },
+        jwt,
+      );
+
+      setUser((prev) => ({
+        ...prev,
+        identifier: updatedUser.identifier || identifierValue,
+      }));
+
       setEditingIdentifier(false);
     } catch (err) {
       console.error("Failed to update identifier:", err);
@@ -164,6 +172,7 @@ export default function ProfilePage() {
   const handlePasswordSave = async () => {
     try {
       await editUser({ _id: user._id, password: passwordValue }, jwt);
+
       setPasswordValue("");
       setShowPassword(false);
       setEditingPassword(false);
@@ -216,7 +225,7 @@ export default function ProfilePage() {
 
       const normalizedPhone = normalizePHPhone(profile.phone);
 
-      await editUser(
+      const updatedUser = await editUser(
         {
           _id: user._id,
           name: profile.name,
@@ -226,11 +235,11 @@ export default function ProfilePage() {
         jwt,
       );
 
-      setProfile((prev) => ({
+      // 🔥 CRITICAL FIX: update global user
+      setUser((prev) => ({
         ...prev,
-        name: profile.name,
-        phone: normalizedPhone,
-        address: profile.address,
+        ...updatedUser,
+        _id: updatedUser.id || prev._id,
       }));
 
       setEditingProfile(false);

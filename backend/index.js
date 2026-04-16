@@ -11,6 +11,7 @@ import expenseRoutes from "./routes/ExpenseRoute.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import { logger } from "./middleware/logger.js";
 import cors from "cors";
+import mongoose from "mongoose";
 
 dotenv.config();
 const app = express();
@@ -164,6 +165,24 @@ app.use(
     credentials: true,
   }),
 );
+
+app.get("/api/health", async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      console.warn("DB connecting...");
+      return res.status(503).json({ status: "connecting" });
+    }
+
+    await mongoose.connection.db.admin().ping();
+
+    console.log("Health check passed");
+    res.status(200).json({ status: "ok" });
+  } catch {
+    console.warn("Health check failed - DB not ready");
+    res.status(503).json({ status: "db not ready" });
+  }
+});
+
 app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);

@@ -54,7 +54,7 @@ export default function ExpensePage() {
   const resetForm = () => {
     setAmount("");
     setCategory("misc");
-    setNote("");
+    setNote("debit");
     setDate("");
     setEditingId(null);
   };
@@ -72,7 +72,6 @@ export default function ExpensePage() {
       });
 
       setAmount("");
-      setNote("");
       setDate("");
       loadExpenses();
     } catch (err) {
@@ -117,17 +116,20 @@ export default function ExpensePage() {
             <option value="utilities">Utilities</option>
             <option value="misc">Misc</option>
           </select>
+          <select
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="debit">Debit</option>
+            <option value="credit">Credit</option>
+            <option value="cash">Cash</option>
+            <option value="e-wallet">E-Wallet</option>
+          </select>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="border p-2 rounded"
-          />
-          <input
-            type="text"
-            placeholder="Note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
             className="border p-2 rounded"
           />
           <button className="bg-black text-white px-3 rounded">
@@ -154,7 +156,10 @@ export default function ExpensePage() {
               <div>
                 <p className="font-bold">₱ {e.amount}</p>
                 <p className="text-xs">{e.category}</p>
-                <p className="text-xs text-gray-500">{e.note}</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(e.date).toLocaleDateString()} |{" "}
+                  {e.note == "" ? "No note" : e.note.toUpperCase()}
+                </p>
               </div>
 
               <div className="flex gap-2">

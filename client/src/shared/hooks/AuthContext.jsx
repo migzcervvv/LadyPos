@@ -4,22 +4,35 @@ import { loginUser } from "../../features/auth/api/authApi";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+  const [user, setUserState] = useState(null);
   const [jwt, setJwt] = useState(null);
   const [error, setError] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔥 central setter (fixes your bug)
+  const setUser = (userData) => {
+    setUserState(userData);
+
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+    } else {
+      localStorage.removeItem("user");
+    }
+  };
 
   useEffect(() => {
     const storedJwt = localStorage.getItem("jwt");
     const storedUser = localStorage.getItem("user");
 
-    if (storedJwt && storedUser) {
-      setJwt(storedJwt);
-      setUser(JSON.parse(storedUser));
-      if (storedUser.confirmed) {
-        setIsAuthenticated(true);
+    if (storedJwt && storedUser && storedUser !== "undefined") {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+
+        setJwt(storedJwt);
+        setUserState(parsedUser);
+      } catch (err) {
+        console.error("Invalid user in localStorage:", storedUser);
+        localStorage.removeItem("user");
       }
     }
 
@@ -31,6 +44,7 @@ export function AuthProvider({ children }) {
 
     try {
       const data = await loginUser({ identifier, password });
+
       const userData = {
         _id: data._id,
         identifier: data.identifier,
@@ -45,16 +59,14 @@ export function AuthProvider({ children }) {
       setUser(userData);
 
       localStorage.setItem("jwt", data.token);
-      localStorage.setItem("user", JSON.stringify(userData));
 
-      return data; // ✅ important
+      return data;
     } catch (err) {
       setJwt(null);
       setUser(null);
       setError(err.response?.data?.message || "Login failed");
       localStorage.clear();
 
-      // axios error handling
       throw new Error(err.response?.data?.message || "Login failed");
     } finally {
       setIsLoading(false);
@@ -62,21 +74,16 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem("jwt");
-    localStorage.removeItem("user");
-    localStorage.removeItem("role");
-    localStorage.removeItem("isAuthenticated");
+    localStorage.clear();
     setJwt(null);
     setUser(null);
-    setRole(null);
-    setIsAuthenticated(false);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role,
+        setUser, // 🔥 THIS FIXES YOUR EDIT ISSUE
         jwt,
         isAuthenticated: !!user,
         isLoading,

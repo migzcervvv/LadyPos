@@ -12,6 +12,8 @@ import OrdersPage from "../features/orders/pages/OrdersPage.jsx";
 import FinancialPage from "../features/financials/pages/FinancialPage.jsx";
 import InvoicesPage from "../features/invoices/pages/InvoicePage.jsx";
 import ExpensePage from "../features/financials/pages/ExpensePage.jsx";
+import { LoadingScreen } from "../shared/components/LoadingScreen.jsx";
+import { useServerReady } from "../shared/utils/useServerReady.js";
 
 const router = createBrowserRouter([
   {
@@ -71,5 +73,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
+  const { ready } = useServerReady();
+
+  if (!ready) {
+    return <LoadingScreen />;
+  }
   return <RouterProvider router={router} />;
 }
