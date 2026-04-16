@@ -80,12 +80,18 @@ export default function AddOrderModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 flex justify-center items-center bg-black/40 z-50">
+    <div
+      className="fixed inset-0 flex justify-center items-center z-50"
+      style={{
+        backgroundColor: "rgba(0,0,0,0.5)",
+      }}
+    >
       <div
-        className="w-full max-w-md p-6 rounded-xl"
+        className="w-full max-w-md p-6 rounded-xl border"
         style={{
           backgroundColor: "var(--color-surface)",
           color: "var(--color-text)",
+          borderColor: "var(--color-border)",
         }}
       >
         <h2 className="text-xl font-bold mb-4">Add Order</h2>
@@ -93,7 +99,8 @@ export default function AddOrderModal({ onClose, onSuccess }) {
         {/* CUSTOMER */}
         <div className="mb-4">
           <div className="flex justify-between mb-2">
-            <label>Customer</label>
+            <label style={{ color: "var(--color-muted)" }}>Customer</label>
+
             <button
               onClick={() => setShowAddPerson(true)}
               style={{ color: "var(--color-primary)" }}
@@ -103,7 +110,7 @@ export default function AddOrderModal({ onClose, onSuccess }) {
           </div>
 
           <select
-            className="w-full p-2 rounded border"
+            className="input w-full"
             value={personId}
             onChange={(e) => setPersonId(e.target.value)}
           >
@@ -118,17 +125,17 @@ export default function AddOrderModal({ onClose, onSuccess }) {
           {showAddPerson && (
             <div className="mt-2">
               <input
-                className="w-full p-2 border rounded mb-2"
+                className="input w-full mb-2"
                 placeholder="Customer name"
                 value={newPersonName}
                 onChange={(e) => setNewPersonName(e.target.value)}
               />
+
               <button
                 onClick={handleAddPerson}
-                className="w-full py-2 rounded"
+                className="w-full py-2 rounded text-white"
                 style={{
                   backgroundColor: "var(--color-primary)",
-                  color: "#fff",
                 }}
               >
                 Add Customer
@@ -138,7 +145,10 @@ export default function AddOrderModal({ onClose, onSuccess }) {
         </div>
 
         {/* PRODUCTS */}
-        <div className="mb-4" style={{ maxHeight: "200px", overflowY: "auto" }}>
+        <div
+          className="mb-4 space-y-2"
+          style={{ maxHeight: "200px", overflowY: "auto" }}
+        >
           {products.map((p) => {
             const selected = selectedProducts.find(
               (sp) => sp.productId === p._id,
@@ -148,12 +158,12 @@ export default function AddOrderModal({ onClose, onSuccess }) {
               <div
                 key={p._id}
                 onClick={() => toggleProduct(p)}
-                className="p-2 mb-2 rounded cursor-pointer flex justify-between"
+                className="p-2 rounded cursor-pointer flex justify-between items-center border"
                 style={{
-                  border: "1px solid var(--color-border)",
+                  borderColor: "var(--color-border)",
                   backgroundColor: selected
                     ? "var(--color-secondary)"
-                    : "var(--color-surface)",
+                    : "var(--color-bg)",
                 }}
               >
                 <span>{p.name}</span>
@@ -163,7 +173,7 @@ export default function AddOrderModal({ onClose, onSuccess }) {
                     type="number"
                     min={1}
                     value={selected.quantity}
-                    className="w-16 text-center border rounded"
+                    className="w-16 text-center input"
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => updateQty(p._id, +e.target.value)}
                   />
@@ -176,7 +186,11 @@ export default function AddOrderModal({ onClose, onSuccess }) {
         <p className="mb-4 font-semibold">Total: ₱ {total}</p>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded border">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded border"
+            style={{ borderColor: "var(--color-border)" }}
+          >
             Cancel
           </button>
 

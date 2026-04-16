@@ -64,23 +64,33 @@ export default function ActiveProductsModal({ onClose, onSuccess }) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-3xl p-6">
+    <div
+      className="fixed inset-0 flex justify-center items-center z-50"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+    >
+      <div
+        className="w-full max-w-3xl p-6 rounded-xl border"
+        style={{
+          backgroundColor: "var(--color-surface)",
+          color: "var(--color-text)",
+          borderColor: "var(--color-border)",
+        }}
+      >
         <h2 className="text-xl font-semibold mb-4">
           Set Active Products (POS)
         </h2>
 
-        {/* 🔍 SEARCH + FILTER */}
-        <div className="flex gap-2 mb-4">
+        {/* SEARCH + FILTER */}
+        <div className="flex flex-col gap-2 mb-4">
           <input
-            className="flex-1 p-2 border rounded-lg"
+            className="input flex-1"
             placeholder="Search product..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
           <select
-            className="p-2 border rounded-lg"
+            className="input"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -92,26 +102,35 @@ export default function ActiveProductsModal({ onClose, onSuccess }) {
           </select>
         </div>
 
-        {/* ⚡ ACTION BUTTONS */}
+        {/* ACTIONS */}
         <div className="flex gap-2 mb-2">
           <button
             onClick={handleSelectAll}
-            className="px-3 py-1 border rounded-lg text-sm"
+            className="px-3 py-1 rounded-lg text-sm border"
+            style={{ borderColor: "var(--color-border)" }}
           >
             Select All
           </button>
+
           <button
             onClick={handleClearAll}
-            className="px-3 py-1 border rounded-lg text-sm"
+            className="px-3 py-1 rounded-lg text-sm border"
+            style={{ borderColor: "var(--color-border)" }}
           >
             Clear All
           </button>
         </div>
 
         {/* TABLE */}
-        <div className="max-h-96 overflow-y-auto border rounded-lg">
+        <div
+          className="max-h-96 overflow-y-auto rounded-lg border"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <table className="w-full text-sm">
-            <thead className="bg-gray-100 sticky top-0">
+            <thead
+              className="sticky top-0"
+              style={{ backgroundColor: "var(--color-bg)" }}
+            >
               <tr>
                 <th className="p-3 text-left">Active</th>
                 <th className="p-3 text-left">Product</th>
@@ -119,9 +138,15 @@ export default function ActiveProductsModal({ onClose, onSuccess }) {
                 <th className="p-3 text-left">Price</th>
               </tr>
             </thead>
+
             <tbody>
               {filtered.map((p) => (
-                <tr key={p._id} className="border-t">
+                <tr
+                  key={p._id}
+                  style={{
+                    borderTop: "1px solid var(--color-border)",
+                  }}
+                >
                   <td className="p-3">
                     <input
                       type="checkbox"
@@ -138,21 +163,30 @@ export default function ActiveProductsModal({ onClose, onSuccess }) {
           </table>
 
           {filtered.length === 0 && (
-            <div className="p-4 text-center text-gray-500">
+            <div
+              className="p-4 text-center"
+              style={{ color: "var(--color-muted)" }}
+            >
               No products found
             </div>
           )}
         </div>
 
-        {/* ACTIONS */}
+        {/* FOOTER */}
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-black text-white rounded-lg"
+            className="px-4 py-2 rounded-lg text-white"
+            style={{ backgroundColor: "var(--color-primary)" }}
           >
             Save
           </button>
-          <button onClick={onClose} className="px-4 py-2 border rounded-lg">
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border"
+            style={{ borderColor: "var(--color-border)" }}
+          >
             Cancel
           </button>
         </div>

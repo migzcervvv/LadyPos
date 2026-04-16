@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/AuthContext.jsx";
+import ThemeToggle from "../../services/ThemeToggle.jsx";
 
 export default function Layout() {
   const location = useLocation();
@@ -92,21 +93,29 @@ export default function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="px-4 py-6 space-y-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.name}
-              onClick={() => handleTabClick(tab)}
-              className={`w-full text-left flex items-center px-3 py-2 rounded-lg transition-colors duration-200
-                ${
-                  location.pathname === tab.path
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "text-[var(--color-text)] hover:bg-[var(--color-secondary)]"
-                }`}
-            >
-              {tab.name}
-            </button>
-          ))}
+        <nav className="px-3 py-6 flex flex-col h-full">
+          {/* Menu Items */}
+          <div className="space-y-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.name}
+                onClick={() => handleTabClick(tab)}
+                className={`w-full text-left flex items-center px-3 py-2 rounded-lg transition-colors duration-200
+                  ${
+                    location.pathname === tab.path
+                      ? "bg-[var(--color-primary)] text-white"
+                      : "text-[var(--color-text)] hover:bg-[var(--color-secondary)]"
+                  }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </div>
+          <div className="pt-4 border-t border-[var(--color-border)]">
+            <ThemeToggle />
+          </div>
+          {/* 🔥 Spacer pushes toggle down */}
+          <div className="flex-1" />
         </nav>
       </div>
 

@@ -92,6 +92,7 @@ export default function OrdersPage() {
     >
       <div className="flex-shrink-0">
         <h1 className="text-xl font-bold mb-3">Orders</h1>
+
         <button
           onClick={() => navigate("/pos")}
           className="mb-3 px-3 py-2 rounded"
@@ -99,51 +100,47 @@ export default function OrdersPage() {
         >
           ← Back to POS
         </button>
+
         {/* TABS */}
         <div className="flex mb-3 gap-2">
-          <button
-            onClick={() => setTab("pending")}
-            className="flex-1 py-2 rounded"
-            style={{
-              backgroundColor:
-                tab === "pending"
-                  ? "var(--color-primary)"
-                  : "var(--color-surface)",
-            }}
-          >
-            Pending
-          </button>
-
-          <button
-            onClick={() => setTab("completed")}
-            className="flex-1 py-2 rounded"
-            style={{
-              backgroundColor:
-                tab === "completed"
-                  ? "var(--color-primary)"
-                  : "var(--color-surface)",
-            }}
-          >
-            Completed
-          </button>
+          {["pending", "completed"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="flex-1 py-2 rounded"
+              style={{
+                backgroundColor:
+                  tab === t ? "var(--color-primary)" : "var(--color-surface)",
+                color: tab === t ? "#fff" : "var(--color-text)",
+                border: tab === t ? "none" : "1px solid var(--color-border)",
+              }}
+            >
+              {t === "pending" ? "Pending" : "Completed"}
+            </button>
+          ))}
         </div>
+
         <div className="flex-1 overflow-y-scroll pr-1 pb-20">
           {/* FILTERS */}
-          <div className="flex flex-col gap-2 mb-3">
-            {/* SEARCH */}
+          <div
+            className="flex flex-col gap-2 mb-3 p-3 rounded-xl border"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
             <input
               placeholder="Search customer / reference..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="p-2 rounded border"
+              className="input"
             />
 
-            {/* ROW 1 */}
             <div className="grid grid-cols-3 gap-2">
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="p-2 rounded border"
+                className="input"
               >
                 <option value="all">All Types</option>
                 <option value="walkin">Walk-in</option>
@@ -155,7 +152,7 @@ export default function OrdersPage() {
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
-                className="p-2 rounded border"
+                className="input"
               >
                 <option value="all">All Payments</option>
                 <option value="paid">Paid</option>
@@ -165,7 +162,7 @@ export default function OrdersPage() {
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="p-2 rounded border"
+                className="input"
               >
                 <option value="today">Today</option>
                 <option value="7days">Last 7 Days</option>
@@ -173,27 +170,28 @@ export default function OrdersPage() {
               </select>
             </div>
           </div>
+
           {/* ORDER LIST */}
           <div className="flex flex-col gap-3">
             {filtered.map((order) => (
               <div
                 key={order._id}
                 onClick={() => setSelectedOrder(order)}
-                className="p-3 rounded-xl shadow cursor-pointer flex flex-col gap-2"
+                className="p-3 rounded-xl cursor-pointer flex flex-col gap-2 border"
                 style={{
                   backgroundColor: "var(--color-surface)",
-                  border: `1px solid ${
+                  borderColor:
                     order.paymentStatus === "debt"
-                      ? "red"
+                      ? "#ef4444"
                       : order.customerType === "grab"
-                        ? "green"
-                        : "var(--color-border)"
-                  }`,
+                        ? "#22c55e"
+                        : "var(--color-border)",
                 }}
               >
-                {/* TOP ROW */}
+                {/* TOP */}
                 <div className="flex justify-between items-center">
                   <p className="font-bold text-lg">₱ {order.total}</p>
+
                   <p
                     className="text-xs"
                     style={{ color: "var(--color-muted)" }}
@@ -209,30 +207,48 @@ export default function OrdersPage() {
                   </span>
                 </div>
 
-                {/* META TAGS */}
+                {/* TAGS */}
                 <div className="flex flex-wrap gap-1">
-                  <span className="text-xs px-2 py-1 rounded bg-gray-200">
+                  <span
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      backgroundColor: "var(--color-border)",
+                    }}
+                  >
                     {order.customerType} {order.reference || ""}
                   </span>
 
                   <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      order.paymentStatus === "debt"
-                        ? "bg-red-200"
-                        : "bg-green-200"
-                    }`}
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      backgroundColor:
+                        order.paymentStatus === "debt"
+                          ? "rgba(239,68,68,0.2)"
+                          : "rgba(34,197,94,0.2)",
+                    }}
                   >
                     {order.orderStatus} • {order.paymentStatus}
                   </span>
 
-                  <span className="text-xs px-2 py-1 rounded bg-blue-100">
+                  <span
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      backgroundColor: "rgba(59,130,246,0.15)",
+                    }}
+                  >
                     {order.products.length} items
                   </span>
                 </div>
 
                 {/* NOTES */}
                 {order.notes && (
-                  <div className="p-2 rounded bg-yellow-50 border text-xs line-clamp-2">
+                  <div
+                    className="p-2 rounded border text-xs line-clamp-2"
+                    style={{
+                      backgroundColor: "rgba(250,204,21,0.1)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
                     <span className="font-medium">Note:</span> {order.notes}
                   </div>
                 )}
@@ -242,7 +258,7 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* UPDATE MODAL */}
+      {/* MODAL */}
       {selectedOrder && (
         <UpdateOrderModal
           order={selectedOrder}

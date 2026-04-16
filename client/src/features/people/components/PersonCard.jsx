@@ -85,41 +85,60 @@ export default function PersonCard({ person, refresh }) {
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+    <div
+      className="rounded-2xl border p-4 space-y-3"
+      style={{
+        backgroundColor: "var(--color-surface)",
+        borderColor: "var(--color-border)",
+        color: "var(--color-text)",
+      }}
+    >
       {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
           <h2 className="font-semibold text-base">{person.name}</h2>
 
           {person.contactInfo && (
-            <p className="text-xs text-gray-500">{person.contactInfo}</p>
+            <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+              {person.contactInfo}
+            </p>
           )}
 
           {person.notes && (
-            <p className="text-xs italic text-gray-400">{person.notes}</p>
+            <p
+              className="text-xs italic"
+              style={{ color: "var(--color-muted)" }}
+            >
+              {person.notes}
+            </p>
           )}
         </div>
 
         <div className="text-right">
-          <p className="text-xs text-gray-400">Balance</p>
+          <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+            Balance
+          </p>
+
           <p
-            className={`text-lg font-bold ${
-              balance < 0 ? "text-red-500" : "text-green-600"
-            }`}
+            className="text-lg font-bold"
+            style={{
+              color: balance < 0 ? "#ef4444" : "rgba(34,197,94,0.9)",
+            }}
           >
             ₱ {balance}
           </p>
         </div>
       </div>
 
-      {/* ACTION BUTTONS */}
+      {/* ACTIONS */}
       <div className="flex gap-2">
         <button
           onClick={() => {
             setIsPayment(false);
             setShowDebtForm((prev) => !prev);
           }}
-          className="flex-1 md:w-40 bg-green-500 text-white py-2 rounded-xl text-sm active:scale-95"
+          className="flex-1 py-2 rounded-xl text-sm text-white"
+          style={{ backgroundColor: "var(--color-accent)" }}
         >
           + Debt
         </button>
@@ -129,7 +148,8 @@ export default function PersonCard({ person, refresh }) {
             setIsPayment(true);
             setShowDebtForm((prev) => !prev);
           }}
-          className="flex-1 md:w-40 bg-blue-500 text-white py-2 rounded-xl text-sm active:scale-95"
+          className="flex-1 py-2 rounded-xl text-sm text-white"
+          style={{ backgroundColor: "var(--color-primary)" }}
         >
           + Payment
         </button>
@@ -137,88 +157,113 @@ export default function PersonCard({ person, refresh }) {
 
       {/* FORM */}
       {showDebtForm && <DebtForm onSubmit={handleAdd} isPayment={isPayment} />}
+
+      {/* MANAGE */}
       <div className="flex justify-start pt-2">
         <button
           onClick={() => setShowEdit(true)}
-          className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg active:scale-95"
+          className="text-xs px-3 py-1.5 rounded-lg"
+          style={{
+            backgroundColor: "var(--color-border)",
+          }}
         >
           ⚙ Manage
         </button>
       </div>
+
       {/* TRANSACTIONS */}
       <div className="pt-2">
         <button
           onClick={() => setOpen((prev) => !prev)}
-          className="w-full text-left text-sm font-medium text-gray-600"
+          className="w-full text-left text-sm font-medium"
+          style={{ color: "var(--color-muted)" }}
         >
           Transactions {open ? "▲" : "▼"}
         </button>
 
         {open && (
-          <div className="mt-2 p-2 rounded-2xl bg-gray-50 border space-y-2 max-h-64 overflow-y-auto">
+          <div
+            className="mt-2 p-2 rounded-2xl border space-y-2 max-h-64 overflow-y-auto"
+            style={{
+              backgroundColor: "var(--color-bg)",
+              borderColor: "var(--color-border)",
+            }}
+          >
             {sortedTransactions?.length ? (
               sortedTransactions.map((t) => {
                 const isDebt = t.kind === "charge";
 
                 return (
                   <div
-                    key={t._id || t.id} // 🔥 fix potential key issue
-                    className={`p-3 rounded-xl text-sm flex justify-between border
-                    ${
-                      isDebt
-                        ? "bg-red-50 border-red-100"
-                        : "bg-green-50 border-green-100"
-                    }`}
+                    key={t._id || t.id}
+                    className="p-3 rounded-xl text-sm flex justify-between border"
+                    style={{
+                      backgroundColor: isDebt
+                        ? "rgba(239,68,68,0.1)"
+                        : "rgba(34,197,94,0.1)",
+                      borderColor: "var(--color-border)",
+                    }}
                   >
-                    {/* LEFT */}
                     <div>
-                      <p className="font-medium text-gray-800">
+                      <p className="font-medium">
                         {t.kind} • {t.context}
                       </p>
 
-                      <p className="text-xs text-gray-500">
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--color-muted)" }}
+                      >
                         {new Date(
                           t.date || t.createdAt || Date.now(),
-                        ).toLocaleString("en-US", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
+                        ).toLocaleString()}
                       </p>
 
                       {t.notes && (
-                        <p className="text-xs italic text-gray-500">
+                        <p
+                          className="text-xs italic"
+                          style={{ color: "var(--color-muted)" }}
+                        >
                           {t.notes}
                         </p>
                       )}
                     </div>
 
-                    {/* RIGHT */}
                     <div className="text-right text-xs">
-                      <p className="text-gray-400">Amount</p>
-                      <p className="font-semibold text-gray-700">₱{t.amount}</p>
+                      <p style={{ color: "var(--color-muted)" }}>Amount</p>
+                      <p className="font-semibold">₱{t.amount}</p>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <p className="text-xs text-gray-400 text-center">
+              <p
+                className="text-xs text-center"
+                style={{ color: "var(--color-muted)" }}
+              >
                 No transactions yet
               </p>
             )}
           </div>
         )}
       </div>
+
+      {/* EDIT MODAL */}
       {showEdit && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-4 w-[90%] max-w-sm space-y-3">
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div
+            className="rounded-xl p-4 w-[90%] max-w-sm space-y-3 border"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
             <h3 className="font-semibold text-sm">Manage Person</h3>
 
             <input
-              className="w-full border px-2 py-1 rounded text-sm"
+              className="input w-full text-sm"
               value={editForm.name}
               onChange={(e) =>
                 setEditForm({ ...editForm, name: e.target.value })
@@ -227,16 +272,19 @@ export default function PersonCard({ person, refresh }) {
             />
 
             <input
-              className="w-full border px-2 py-1 rounded text-sm"
+              className="input w-full text-sm"
               value={editForm.contactInfo}
               onChange={(e) =>
-                setEditForm({ ...editForm, contactInfo: e.target.value })
+                setEditForm({
+                  ...editForm,
+                  contactInfo: e.target.value,
+                })
               }
               placeholder="Contact"
             />
 
             <input
-              className="w-full border px-2 py-1 rounded text-sm"
+              className="input w-full text-sm"
               value={editForm.notes}
               onChange={(e) =>
                 setEditForm({ ...editForm, notes: e.target.value })
@@ -247,14 +295,16 @@ export default function PersonCard({ person, refresh }) {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={handleUpdate}
-                className="flex-1 bg-blue-500 text-white py-1.5 rounded text-sm"
+                className="flex-1 py-1.5 rounded text-sm text-white"
+                style={{ backgroundColor: "var(--color-primary)" }}
               >
                 Save
               </button>
 
               <button
                 onClick={handleDelete}
-                className="flex-1 bg-red-500 text-white py-1.5 rounded text-sm"
+                className="flex-1 py-1.5 rounded text-sm text-white"
+                style={{ backgroundColor: "#ef4444" }}
               >
                 Delete
               </button>
@@ -262,7 +312,8 @@ export default function PersonCard({ person, refresh }) {
 
             <button
               onClick={() => setShowEdit(false)}
-              className="w-full text-xs text-gray-500 pt-1"
+              className="w-full text-xs pt-1"
+              style={{ color: "var(--color-muted)" }}
             >
               Cancel
             </button>

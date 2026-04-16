@@ -31,40 +31,68 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Invoices</h1>
-      <div className="flex gap-2 mb-3">
+    <div
+      className="p-4 space-y-4"
+      style={{
+        backgroundColor: "var(--color-bg)",
+        color: "var(--color-text)",
+        minHeight: "100vh",
+      }}
+    >
+      <h1 className="text-xl font-bold">Invoices</h1>
+
+      {/* FILTERS */}
+      <div
+        className="flex gap-2 p-3 rounded-xl border"
+        style={{
+          backgroundColor: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+        }}
+      >
         <input
           type="date"
           onChange={(e) => loadInvoices({ from: e.target.value })}
-          className="border p-2 rounded"
+          className="input"
         />
 
         <select
           onChange={(e) => loadInvoices({ status: e.target.value })}
-          className="border p-2 rounded"
+          className="input"
         >
           <option value="">All</option>
           <option value="completed">Completed</option>
         </select>
       </div>
+
+      {/* LIST */}
       <div className="space-y-3">
         {invoices.map((inv) => (
           <div
             key={inv._id}
-            className="p-3 border rounded flex justify-between"
+            className="p-4 rounded-xl border flex justify-between items-center"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
           >
             <div>
               <p className="font-bold">{inv.invoiceNumber}</p>
-              <p className="text-sm">₱ {inv.total.toFixed(2)}</p>
-              <p className="text-xs">
+
+              <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                ₱ {inv.total.toFixed(2)}
+              </p>
+
+              <p className="text-xs" style={{ color: "var(--color-muted)" }}>
                 {new Date(inv.issuedAt).toLocaleString()}
               </p>
             </div>
 
             <button
               onClick={() => handlePrint(inv.orderId)}
-              className="px-3 py-2 bg-black text-white rounded"
+              className="px-3 py-2 rounded text-white"
+              style={{
+                backgroundColor: "var(--color-primary)",
+              }}
             >
               Print
             </button>

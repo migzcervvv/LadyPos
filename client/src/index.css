@@ -15,15 +15,17 @@
 
 /* Dark mode (optional future-proofing) */
 [data-theme="dark"] {
-  --color-primary: #b38564; /* Keep primary consistent */
-  --color-secondary: #f4c68a; /* Keep secondary consistent */
-  --color-accent: #f28c61; /* Keep accent consistent */
+  --color-primary: #c89a78; /* slightly lifted for dark bg */
+  --color-secondary: #e8b97a;
+  --color-accent: #f28c61;
 
-  --color-bg: #1f2937; /* Darker background for better contrast */
-  --color-surface: #11181c; /* Dark surface for cards */
-  --color-text: #e5e7eb; /* Light text for readability */
-  --color-muted: #6b7280; /* Darker gray for labels */
-  --color-border: #374151; /* Darker border for separation */
+  --color-bg: #14110f; /* warm near-black (not blue) */
+  --color-surface: #1c1815; /* slightly lifted surface */
+
+  --color-text: #f3e9e2; /* warm off-white */
+  --color-muted: #a89b93; /* warm muted text */
+
+  --color-border: #2a2420; /* subtle warm border */
 }
 
 /* 🔥 Base Reset (Tailwind-friendly) */

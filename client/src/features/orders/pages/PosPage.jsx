@@ -87,7 +87,7 @@ export default function POSPage() {
   return (
     <>
       <div
-        className="h-screen flex flex-col md:flex-row overflow-hidden min-h-screen"
+        className="h-screen flex flex-col md:flex-row overflow-hidden"
         style={{
           backgroundColor: "var(--color-bg)",
           color: "var(--color-text)",
@@ -96,6 +96,7 @@ export default function POSPage() {
         {/* LEFT: PRODUCTS */}
         <div className="flex-1 md:w-2/3 p-3 md:p-4 overflow-y-auto">
           <h2 className="text-xl font-bold mb-4">Products</h2>
+
           <button
             onClick={() => navigate("/orders")}
             className="px-3 py-2 mb-4 rounded"
@@ -103,12 +104,13 @@ export default function POSPage() {
           >
             View Orders
           </button>
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {activeProducts.map((p) => (
               <button
                 key={p._id}
                 onClick={() => addToCart(p)}
-                className="p-3 rounded-lg text-left shadow"
+                className="p-3 rounded-lg text-left"
                 style={{
                   backgroundColor: "var(--color-surface)",
                   border: "1px solid var(--color-border)",
@@ -127,7 +129,7 @@ export default function POSPage() {
         <div
           className="max-h-[65%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-auto"
           style={{
-            borderLeft: "1px solid var(--color-border)",
+            borderColor: "var(--color-border)",
             backgroundColor: "var(--color-surface)",
           }}
         >
@@ -135,7 +137,6 @@ export default function POSPage() {
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-lg font-bold">Cart</h2>
 
-              {/* Desktop button */}
               <button
                 onClick={() => setShowAddPerson(true)}
                 className="hidden md:block px-3 py-1 rounded text-sm"
@@ -145,7 +146,6 @@ export default function POSPage() {
               </button>
             </div>
 
-            {/* Mobile FULL WIDTH button */}
             <button
               onClick={() => setShowAddPerson(true)}
               className="w-full py-2 rounded md:hidden"
@@ -154,7 +154,7 @@ export default function POSPage() {
               + Add Customer
             </button>
           </div>
-          {/* CUSTOMER */}
+
           {/* CUSTOMER TYPE */}
           <div className="mb-3">
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -163,19 +163,20 @@ export default function POSPage() {
                   key={type}
                   onClick={() => {
                     setCustomerType(type);
-                    setReference(""); // ✅ reset reference
+                    setReference("");
                     if (type !== "customer") setPersonId("");
                   }}
-                  className={`py-2 rounded-lg text-sm font-medium transition ${
-                    customerType === type
-                      ? "text-white shadow"
-                      : "border hover:bg-[var(--color-secondary)]"
-                  }`}
+                  className="py-2 rounded-lg text-sm font-medium"
                   style={{
                     backgroundColor:
                       customerType === type
                         ? "var(--color-primary)"
                         : "transparent",
+                    color: customerType === type ? "#fff" : "var(--color-text)",
+                    border:
+                      customerType === type
+                        ? "none"
+                        : "1px solid var(--color-border)",
                   }}
                 >
                   {type}
@@ -183,10 +184,9 @@ export default function POSPage() {
               ))}
             </div>
 
-            {/* CONDITIONAL INPUT */}
             {customerType === "customer" && (
               <select
-                className="w-full p-2 border rounded"
+                className="input w-full"
                 value={personId}
                 onChange={(e) => setPersonId(e.target.value)}
               >
@@ -199,37 +199,34 @@ export default function POSPage() {
               </select>
             )}
 
-            {customerType === "grab" && (
+            {(customerType === "grab" || customerType === "foodpanda") && (
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                placeholder="Grab reference (optional)"
-                className="w-full p-2 border rounded"
-              />
-            )}
-
-            {customerType === "foodpanda" && (
-              <input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="Foodpanda reference (optional)"
-                className="w-full p-2 border rounded"
+                placeholder={`${customerType} reference (optional)`}
+                className="input w-full"
               />
             )}
           </div>
-          {/* ORDER INSTRUCTIONS */}
+
+          {/* NOTES */}
           <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">
+            <label
+              className="block text-sm mb-1"
+              style={{ color: "var(--color-muted)" }}
+            >
               Order instructions
             </label>
+
             <textarea
               value={orderInstructions}
               onChange={(e) => setOrderInstructions(e.target.value)}
               placeholder="Add notes for this order..."
-              className="w-full p-2 border rounded"
+              className="input w-full"
               rows={2}
             />
           </div>
+
           {/* CART ITEMS */}
           <div
             className="flex-1 overflow-y-auto mb-4"
@@ -253,6 +250,7 @@ export default function POSPage() {
                   <button
                     onClick={() => updateQty(p.productId, p.quantity - 1)}
                     className="px-2 rounded border"
+                    style={{ borderColor: "var(--color-border)" }}
                   >
                     -
                   </button>
@@ -262,6 +260,7 @@ export default function POSPage() {
                   <button
                     onClick={() => updateQty(p.productId, p.quantity + 1)}
                     className="px-2 rounded border"
+                    style={{ borderColor: "var(--color-border)" }}
                   >
                     +
                   </button>
@@ -283,12 +282,13 @@ export default function POSPage() {
           </button>
         </div>
       </div>
+
       {showAddPerson && (
         <AddPersonModal
           onClose={() => setShowAddPerson(false)}
           onCreated={(newPerson) => {
             setPersons((prev) => [...prev, newPerson]);
-            setPersonId(newPerson._id); // auto-select
+            setPersonId(newPerson._id);
           }}
         />
       )}
@@ -309,20 +309,26 @@ function AddPersonModal({ onClose, onCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+    >
       <div
-        className="w-full md:max-w-sm rounded-t-2xl md:rounded-xl p-4 animate-slideUp"
+        className="w-full md:max-w-sm rounded-t-2xl md:rounded-xl p-4"
         style={{
           backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
         }}
       >
-        {/* HANDLE (mobile UX detail) */}
-        <div className="w-10 h-1 bg-gray-400 rounded mx-auto mb-3 md:hidden"></div>
+        <div
+          className="w-10 h-1 rounded mx-auto mb-3 md:hidden"
+          style={{ backgroundColor: "var(--color-border)" }}
+        />
 
         <h3 className="text-lg font-semibold mb-3">New Customer</h3>
 
         <input
-          className="w-full p-3 rounded-lg border mb-4"
+          className="input w-full mb-4"
           placeholder="Enter name..."
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -337,7 +343,11 @@ function AddPersonModal({ onClose, onCreated }) {
             Save Customer
           </button>
 
-          <button onClick={onClose} className="w-full py-2 rounded border">
+          <button
+            onClick={onClose}
+            className="w-full py-2 rounded border"
+            style={{ borderColor: "var(--color-border)" }}
+          >
             Cancel
           </button>
         </div>

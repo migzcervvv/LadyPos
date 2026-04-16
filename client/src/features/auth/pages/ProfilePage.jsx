@@ -252,25 +252,39 @@ export default function ProfilePage() {
     }
   };
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* ========================= */}
-      {/* PROFILE SECTION */}
-      {/* ========================= */}
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* ================= PROFILE CARD ================= */}
-        <div className="bg-white rounded-2xl shadow-sm border p-5">
+    <div
+      className="max-w-6xl mx-auto"
+      style={{
+        backgroundColor: "var(--color-bg)",
+        color: "var(--color-text)",
+        minHeight: "100vh",
+      }}
+    >
+      {/* PROFILE + SECURITY */}
+      <div className="max-w-3xl mx-auto space-y-6 py-6">
+        {/* PROFILE CARD */}
+        <div
+          className="rounded-2xl shadow-sm border p-5"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
+        >
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-lg font-semibold">Profile</h2>
-              <p className="text-sm text-gray-500">
+              <p style={{ color: "var(--color-muted)" }}>
                 Manage your personal information
               </p>
             </div>
 
             {!editingProfile && (
               <button
-                className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
                 onClick={() => setEditingProfile(true)}
+                className="px-3 py-1.5 rounded-lg"
+                style={{
+                  backgroundColor: "var(--color-border)",
+                }}
               >
                 Edit
               </button>
@@ -278,29 +292,22 @@ export default function ProfilePage() {
           </div>
 
           {editingProfile ? (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid gap-3">
               <input
                 className="input"
                 placeholder="Full name"
                 value={profile.name}
-                onChange={(e) =>
-                  setProfile({ ...profile, name: e.target.value })
-                }
               />
 
               <input
                 className="input"
                 placeholder="Phone number"
                 value={profile.phone}
-                maxLength={13}
-                inputMode="numeric"
                 onChange={(e) =>
                   setProfile({ ...profile, phone: e.target.value })
                 }
               />
-              {formErrors.phone && (
-                <p className="text-red-500 text-sm">{formErrors.phone}</p>
-              )}
+
               <input
                 className="input"
                 placeholder="Address"
@@ -311,142 +318,85 @@ export default function ProfilePage() {
               />
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  className="btn-secondary"
-                  onClick={() => setEditingProfile(false)}
-                >
-                  Cancel
-                </button>
-
-                <button className="btn-primary" onClick={handleProfileSave}>
-                  Save Changes
-                </button>
+                <button className="btn-secondary">Cancel</button>
+                <button className="btn-primary">Save Changes</button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-400">Name</p>
+                <p style={{ color: "var(--color-muted)" }}>Name</p>
                 <p className="font-medium">{profile.name || "-"}</p>
               </div>
 
               <div>
-                <p className="text-gray-400">Phone</p>
+                <p style={{ color: "var(--color-muted)" }}>Phone</p>
                 <p className="font-medium">{profile.phone || "-"}</p>
               </div>
 
               <div className="sm:col-span-2">
-                <p className="text-gray-400">Address</p>
+                <p style={{ color: "var(--color-muted)" }}>Address</p>
                 <p className="font-medium">{profile.address || "-"}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* ================= SECURITY CARD ================= */}
-        <div className="bg-white rounded-2xl shadow-sm border p-5">
+        {/* SECURITY CARD */}
+        <div
+          className="rounded-2xl shadow-sm border p-5"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
+        >
           <h2 className="text-lg font-semibold mb-4">Security</h2>
 
-          {/* ================= IDENTIFIER ================= */}
-          <div className="border-b py-3">
-            <p className="text-sm text-gray-400 mb-1">Identifier</p>
+          <div
+            className="py-3 border-b"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            <p style={{ color: "var(--color-muted)" }}>Identifier</p>
 
-            {editingIdentifier ? (
-              <div className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  value={identifierValue}
-                  onChange={(e) => setIdentifierValue(e.target.value)}
-                />
+            <div className="flex justify-between items-center">
+              <p className="font-medium">{identifierValue}</p>
 
-                <button className="btn-primary" onClick={handleIdentifierSave}>
-                  Save
-                </button>
-
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setEditingIdentifier(false);
-                    setIdentifierValue(user.identifier);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center">
-                <p className="font-medium">{identifierValue}</p>
-
-                <button
-                  className="btn-secondary"
-                  onClick={() => setEditingIdentifier(true)}
-                >
-                  Edit
-                </button>
-              </div>
-            )}
+              <button
+                onClick={() => setEditingIdentifier(true)}
+                className="px-3 py-1 rounded"
+                style={{ backgroundColor: "var(--color-border)" }}
+              >
+                Edit
+              </button>
+            </div>
           </div>
 
-          {/* ================= PASSWORD ================= */}
           <div className="py-3">
-            <p className="text-sm text-gray-400 mb-1">Password</p>
+            <p style={{ color: "var(--color-muted)" }}>Password</p>
 
-            {editingPassword ? (
-              <div className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  type={showPassword ? "text" : "password"}
-                  value={passwordValue}
-                  onChange={(e) => setPasswordValue(e.target.value)}
-                />
+            <div className="flex justify-between items-center">
+              <p className="font-medium">••••••••</p>
 
-                <button onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? "🙈" : "👁️"}
-                </button>
-
-                <button
-                  className="btn-primary"
-                  onClick={handlePasswordSave}
-                  disabled={!passwordValue}
-                >
-                  Save
-                </button>
-
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setEditingPassword(false);
-                    setPasswordValue("");
-                    setShowPassword(false);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center">
-                <p className="font-medium">••••••••</p>
-
-                <button
-                  className="btn-secondary"
-                  onClick={() => setEditingPassword(true)}
-                >
-                  Change
-                </button>
-              </div>
-            )}
+              <button
+                onClick={() => setEditingPassword(true)}
+                className="px-3 py-1 rounded"
+                style={{ backgroundColor: "var(--color-border)" }}
+              >
+                Change
+              </button>
+            </div>
           </div>
         </div>
       </div>
-      {/* ========================= */}
-      {/* ADMIN SECTION */}
-      {/* ========================= */}
+
+      {/* ADMIN */}
       {user.role === "admin" && (
-        <div>
-          <h2 className="text-2xl font-bold my-4">Users Management</h2>
+        <div className="mt-6">
+          <h2 className="text-2xl font-bold mb-4">Users Management</h2>
 
           <button
-            className="mb-4 bg-[var(--color-primary)] text-white px-4 py-2 rounded"
+            className="px-4 py-2 rounded text-white"
+            style={{ backgroundColor: "var(--color-primary)" }}
             onClick={() => {
               setSelectedUser({
                 identifier: "",
@@ -461,9 +411,14 @@ export default function ProfilePage() {
             + Add User
           </button>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full border rounded">
-              <thead>
+          <div className="overflow-x-auto mt-4">
+            <table
+              className="min-w-full rounded"
+              style={{
+                border: `1px solid var(--color-border)`,
+              }}
+            >
+              <thead style={{ backgroundColor: "var(--color-surface)" }}>
                 <tr>
                   <th className="px-4 py-2">Identifier</th>
                   <th className="px-4 py-2">Role</th>
@@ -473,145 +428,33 @@ export default function ProfilePage() {
 
               <tbody>
                 {users.map((u) => (
-                  <tr key={u._id} className="border-t">
+                  <tr
+                    key={u._id}
+                    style={{
+                      borderTop: `1px solid var(--color-border)`,
+                    }}
+                  >
                     <td className="px-4 py-2">{u.identifier}</td>
                     <td className="px-4 py-2">{u.role}</td>
-                    <td className="px-4 py-2 flex gap-2">
-                      {u._id === user._id ? (
-                        <span className="text-gray-400">Cannot edit self</span>
-                      ) : (
-                        <>
-                          <button
-                            className="bg-[var(--color-accent)] text-white px-3 py-1 rounded"
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setShowModal(true);
-                            }}
-                          >
-                            Edit
-                          </button>
 
-                          <button
-                            className="bg-red-500 text-white px-3 py-1 rounded"
-                            onClick={() => handleDelete(u._id)}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
+                    <td className="px-4 py-2 flex gap-2">
+                      <button
+                        className="px-3 py-1 rounded text-white"
+                        style={{
+                          backgroundColor: "var(--color-accent)",
+                        }}
+                      >
+                        Edit
+                      </button>
+
+                      <button className="bg-red-500 text-white px-3 py-1 rounded">
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* ========================= */}
-      {/* MODAL */}
-      {/* ========================= */}
-      {showModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-[var(--color-surface)] p-6 rounded w-full max-w-sm">
-            <h2 className="text-xl font-bold mb-4">
-              {selectedUser._id ? "Edit User" : "Create User"}
-            </h2>
-            {formErrors.general && (
-              <div className="bg-red-100 text-red-700 p-2 rounded mb-3 text-sm">
-                {formErrors.general}
-              </div>
-            )}
-            <input
-              className="w-full mb-1 p-2 border rounded"
-              placeholder="Identifier"
-              value={selectedUser.identifier}
-              onChange={(e) =>
-                setSelectedUser({
-                  ...selectedUser,
-                  identifier: e.target.value,
-                })
-              }
-            />
-            {formErrors.identifier && (
-              <p className="text-red-500 text-sm mb-2">
-                {formErrors.identifier}
-              </p>
-            )}
-
-            <input
-              className="w-full mb-1 p-2 border rounded"
-              type="password"
-              placeholder="Password"
-              onChange={(e) =>
-                setSelectedUser({
-                  ...selectedUser,
-                  password: e.target.value,
-                })
-              }
-            />
-            {formErrors.password && (
-              <p className="text-red-500 text-sm mb-2">{formErrors.password}</p>
-            )}
-            <input
-              className="w-full mb-1 p-2 border rounded"
-              placeholder="Phone number"
-              maxLength={13}
-              inputMode="numeric"
-              value={selectedUser.phone || ""} // ✅ ADD THIS
-              onChange={(e) =>
-                setSelectedUser({
-                  ...selectedUser,
-                  phone: e.target.value,
-                })
-              }
-            />
-            {formErrors.phone && (
-              <p className="text-red-500 text-sm mb-2">{formErrors.phone}</p>
-            )}
-            <select
-              className="w-full mb-3 p-2 border rounded"
-              value={selectedUser.role}
-              onChange={(e) =>
-                setSelectedUser({
-                  ...selectedUser,
-                  role: e.target.value,
-                })
-              }
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-
-            <label className="flex items-center mb-3 gap-2">
-              <input
-                type="checkbox"
-                checked={selectedUser.confirmed}
-                onChange={(e) =>
-                  setSelectedUser({
-                    ...selectedUser,
-                    confirmed: e.target.checked,
-                  })
-                }
-              />
-              Confirmed
-            </label>
-
-            <div className="flex justify-end gap-2">
-              <button
-                className="bg-[var(--color-primary)] text-white px-4 py-1 rounded"
-                onClick={() => handleSaveUser(selectedUser)}
-              >
-                Save
-              </button>
-
-              <button
-                className="bg-[var(--color-muted)] px-4 py-1 rounded"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}

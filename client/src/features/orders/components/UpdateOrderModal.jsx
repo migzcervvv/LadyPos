@@ -162,31 +162,47 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
       )}
 
       {/* MODAL */}
-      <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center">
-        <div className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col bg-[var(--color-surface)]">
+      <div
+        className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      >
+        <div
+          className="w-full h-[95vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-xl p-4 flex flex-col border"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
+        >
           {/* HEADER */}
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-bold">Order</h2>
 
             <div className="flex items-center gap-2 relative">
               <button onClick={onClose}>✕</button>
-
               <button onClick={() => setShowMenu((p) => !p)}>⋯</button>
 
               {showMenu && (
-                <div className="absolute right-0 top-8 w-44 bg-white border rounded shadow z-10 text-sm">
+                <div
+                  className="absolute right-0 top-8 w-44 rounded shadow z-10 text-sm border"
+                  style={{
+                    backgroundColor: "var(--color-surface)",
+                    borderColor: "var(--color-border)",
+                  }}
+                >
                   {!isCompleted && (
                     <>
                       <button
                         onClick={() => completeOrder("paid")}
-                        className="block w-full text-left p-2 hover:bg-gray-100"
+                        className="block w-full text-left p-2"
+                        style={{ color: "var(--color-text)" }}
                       >
                         ✅ Mark Paid
                       </button>
 
                       <button
                         onClick={() => completeOrder("debt")}
-                        className="block w-full text-left p-2 hover:bg-gray-100"
+                        className="block w-full text-left p-2"
+                        style={{ color: "var(--color-text)" }}
                       >
                         💳 Mark Debt
                       </button>
@@ -195,7 +211,7 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
 
                   <button
                     onClick={handlePrintInvoice}
-                    className="block w-full text-left p-2 hover:bg-gray-100"
+                    className="block w-full text-left p-2"
                   >
                     🧾 Print
                   </button>
@@ -203,7 +219,8 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
                   {canDelete && (
                     <button
                       onClick={handleDelete}
-                      className="block w-full text-left p-2 text-red-500 hover:bg-gray-100"
+                      className="block w-full text-left p-2"
+                      style={{ color: "#ef4444" }}
                     >
                       🗑 Delete
                     </button>
@@ -215,19 +232,23 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
 
           {/* LOCK */}
           {isCompleted && !isAdmin && (
-            <div className="mb-3 p-2 rounded bg-gray-200 text-center text-sm">
+            <div
+              className="mb-3 p-2 rounded text-center text-sm"
+              style={{
+                backgroundColor: "var(--color-border)",
+              }}
+            >
               🔒 Read-only
             </div>
           )}
 
           {/* CONTENT */}
           <div className="flex-1 overflow-y-auto space-y-3">
-            {/* CUSTOMER */}
             <select
               disabled={!isAdmin && isCompleted}
               value={personId}
               onChange={(e) => setPersonId(e.target.value)}
-              className="w-full p-3 border rounded"
+              className="input w-full"
             >
               <option value="">Walk-in</option>
               {persons.map((p) => (
@@ -237,38 +258,44 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
               ))}
             </select>
 
-            {/* NOTES */}
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               disabled={!isAdmin && isCompleted}
               placeholder="Order instructions..."
-              className="w-full p-3 border rounded"
+              className="input w-full"
             />
 
-            {/* PRODUCTS */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {products.map((p) => (
                 <button
                   key={p._id}
                   onClick={() => addProduct(p)}
                   disabled={!isAdmin && isCompleted}
-                  className="px-3 py-2 border rounded whitespace-nowrap"
+                  className="px-3 py-2 rounded border whitespace-nowrap"
+                  style={{
+                    borderColor: "var(--color-border)",
+                  }}
                 >
                   {p.name}
                 </button>
               ))}
             </div>
 
-            {/* ITEMS */}
             {selectedProducts.map((p) => (
               <div
                 key={p.productId}
-                className="flex justify-between items-center border p-2 rounded"
+                className="flex justify-between items-center p-2 rounded border"
+                style={{ borderColor: "var(--color-border)" }}
               >
                 <div>
                   <p>{p.name}</p>
-                  <p className="text-xs">₱ {p.price}</p>
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--color-muted)" }}
+                  >
+                    ₱ {p.price}
+                  </p>
                 </div>
 
                 <div className="flex gap-2 items-center">
@@ -277,7 +304,9 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
                   >
                     -
                   </button>
+
                   <span>{p.quantity}</span>
+
                   <button
                     onClick={() => updateQty(p.productId, p.quantity + 1)}
                   >
@@ -288,48 +317,60 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
             ))}
           </div>
 
-          {/* FOOTER (STICKY) */}
-          <div className="sticky bottom-0 bg-[var(--color-surface)] pt-3 border-t space-y-2">
-            {/* TOTAL */}
+          {/* FOOTER */}
+          <div
+            className="sticky bottom-0 pt-3 border-t space-y-2"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
             <div className="flex justify-between">
               <span>Total</span>
               <span className="font-bold">₱ {total}</span>
             </div>
 
-            {/* PRIMARY */}
             {!isCompleted && (
-              <button
-                onClick={handleSave}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg"
-              >
-                💾 Save
-              </button>
-            )}
-
-            {/* CONTEXTUAL (only if not completed) */}
-            {!isCompleted && (
-              <div className="grid grid-cols-2 gap-2">
+              <>
                 <button
-                  onClick={() => completeOrder("paid")}
-                  className="py-2 bg-green-600 text-white rounded-lg"
+                  onClick={handleSave}
+                  className="w-full py-3 rounded text-white"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                  }}
                 >
-                  ✅ Paid
+                  💾 Save
                 </button>
 
-                <button
-                  onClick={() => completeOrder("debt")}
-                  className="py-2 bg-orange-500 text-white rounded-lg"
-                >
-                  💰 Debt
-                </button>
-              </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => completeOrder("paid")}
+                    className="py-2 rounded text-white"
+                    style={{
+                      backgroundColor: "rgba(34,197,94,0.8)",
+                    }}
+                  >
+                    ✅ Paid
+                  </button>
+
+                  <button
+                    onClick={() => completeOrder("debt")}
+                    className="py-2 rounded text-white"
+                    style={{
+                      backgroundColor: "var(--color-accent)",
+                    }}
+                  >
+                    💰 Debt
+                  </button>
+                </div>
+              </>
             )}
 
-            {/* SECONDARY */}
             <div className="flex gap-2">
               <button
                 onClick={handlePrintInvoice}
-                className="flex-1 py-2 border rounded"
+                className="flex-1 py-2 rounded border"
+                style={{ borderColor: "var(--color-border)" }}
               >
                 🧾 Print
               </button>
@@ -337,7 +378,11 @@ export default function UpdateOrderModal({ order, onClose, onSuccess }) {
               {canDelete && (
                 <button
                   onClick={handleDelete}
-                  className="flex-1 py-2 border border-red-500 text-red-500 rounded"
+                  className="flex-1 py-2 rounded border"
+                  style={{
+                    borderColor: "#ef4444",
+                    color: "#ef4444",
+                  }}
                 >
                   🗑 Delete
                 </button>

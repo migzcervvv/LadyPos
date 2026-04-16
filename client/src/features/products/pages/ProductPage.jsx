@@ -26,21 +26,30 @@ export default function ProductPage() {
   );
 
   return (
-    <div className="p-4 pb-24 max-w-5xl mx-auto">
-      {/* Header */}
+    <div
+      className="p-4 pb-24 max-w-5xl mx-auto"
+      style={{
+        backgroundColor: "var(--color-bg)",
+        color: "var(--color-text)",
+        minHeight: "100vh",
+      }}
+    >
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-semibold">Products</h1>
 
         <button
           onClick={() => setShowActiveModal(true)}
-          className="px-4 py-2 bg-gray-800 text-white rounded-lg"
+          className="px-4 py-2 rounded-lg text-white"
+          style={{ backgroundColor: "var(--color-secondary)" }}
         >
           Set Active (POS)
         </button>
       </div>
-      {/* Search */}
+
+      {/* SEARCH */}
       <input
-        className="w-full p-3 rounded-xl border mb-4"
+        className="input w-full mb-4"
         placeholder="Search product..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -48,15 +57,19 @@ export default function ProductPage() {
 
       {/* EMPTY STATE */}
       {filtered.length === 0 && (
-        <div className="text-center mt-16 text-gray-500">
+        <div
+          className="text-center mt-16"
+          style={{ color: "var(--color-muted)" }}
+        >
           <p className="text-lg font-medium">No products yet</p>
+
           <p className="text-sm mt-2">
             Start by adding your first product using the + button below.
           </p>
         </div>
       )}
 
-      {/* FLEX WRAP GRID */}
+      {/* GRID */}
       <div className="flex flex-wrap gap-4">
         {filtered.map((p) => (
           <ProductCard
@@ -74,18 +87,21 @@ export default function ProductPage() {
         ))}
       </div>
 
-      {/* ADD BUTTON */}
+      {/* FLOATING ADD BUTTON */}
       <button
         onClick={() => {
           setSelectedProduct(null);
           setShowModal(true);
         }}
-        className="fixed bottom-6 right-6 bg-black text-white w-14 h-14 rounded-full text-2xl shadow-lg"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-2xl text-white"
+        style={{
+          backgroundColor: "var(--color-primary)",
+        }}
       >
         +
       </button>
 
-      {/* MODAL */}
+      {/* MODALS */}
       {showModal && (
         <ProductFormModal
           product={selectedProduct}
@@ -102,7 +118,7 @@ export default function ProductPage() {
           onClose={() => setShowActiveModal(false)}
           onSuccess={() => {
             setShowActiveModal(false);
-            loadProducts(); // refresh list
+            loadProducts();
           }}
         />
       )}

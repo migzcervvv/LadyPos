@@ -40,7 +40,11 @@ export default function DebtForm({ onSubmit, isPayment }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-gray-50 border rounded-xl p-3 space-y-2"
+      className="border rounded-xl p-3 space-y-2"
+      style={{
+        backgroundColor: "var(--color-surface)",
+        borderColor: "var(--color-border)",
+      }}
     >
       <input
         name="amount"
@@ -51,7 +55,7 @@ export default function DebtForm({ onSubmit, isPayment }) {
         value={form.amount}
         onChange={handleChange}
         required
-        className="w-full px-3 py-2 rounded-lg border text-sm"
+        className="input w-full text-sm"
       />
 
       <input
@@ -59,15 +63,19 @@ export default function DebtForm({ onSubmit, isPayment }) {
         placeholder="Optional note (e.g. paid cash)"
         value={form.notes}
         onChange={handleChange}
-        className="w-full px-3 py-2 rounded-lg border text-sm"
+        className="input w-full text-sm"
       />
 
       <button
         type="submit"
         disabled={loading}
-        className={`w-full py-2 rounded-xl text-white text-sm transition ${
-          isPayment ? "bg-blue-500" : "bg-green-500"
-        } ${loading ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
+        className="w-full py-2 rounded-xl text-white text-sm"
+        style={{
+          backgroundColor: isPayment
+            ? "var(--color-primary)"
+            : "var(--color-accent)",
+          opacity: loading ? 0.6 : 1,
+        }}
       >
         {loading ? "Saving..." : isPayment ? "Confirm Payment" : "Add Debt"}
       </button>

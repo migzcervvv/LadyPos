@@ -89,11 +89,25 @@ export default function ExpensePage() {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div
+      className="p-4 space-y-4"
+      style={{
+        backgroundColor: "var(--color-bg)",
+        color: "var(--color-text)",
+        minHeight: "100vh",
+      }}
+    >
       <h1 className="text-xl font-bold">Expenses</h1>
 
-      <div>
-        <h2 className="font-semibold mb-2">Add Expense</h2>
+      {/* ADD EXPENSE */}
+      <div
+        className="p-4 rounded-xl border space-y-3"
+        style={{
+          backgroundColor: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+        }}
+      >
+        <h2 className="font-semibold">Add Expense</h2>
 
         <form
           onSubmit={editingId ? handleUpdate : addExpense}
@@ -104,72 +118,96 @@ export default function ExpensePage() {
             placeholder="Amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="border p-2 rounded"
+            className="input"
           />
+
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="border p-2 rounded"
+            className="input"
           >
             <option value="inventory">Inventory</option>
             <option value="rent">Rent</option>
             <option value="utilities">Utilities</option>
             <option value="misc">Misc</option>
           </select>
+
           <select
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="border p-2 rounded"
+            className="input"
           >
             <option value="debit">Debit</option>
             <option value="credit">Credit</option>
             <option value="cash">Cash</option>
             <option value="e-wallet">E-Wallet</option>
           </select>
+
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="border p-2 rounded"
+            className="input"
           />
-          <button className="bg-black text-white px-3 rounded">
+
+          <button
+            className="px-3 rounded text-white"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
             {editingId ? "Update" : "Add"}
-          </button>{" "}
+          </button>
         </form>
       </div>
 
-      <div>
-        <h2 className="font-semibold mb-2">Expenses</h2>
+      {/* EXPENSE LIST */}
+      <div
+        className="p-4 rounded-xl border space-y-3"
+        style={{
+          backgroundColor: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+        }}
+      >
+        <h2 className="font-semibold">Expenses</h2>
 
-        {loading && <p className="text-sm text-gray-400">Loading...</p>}
+        {loading && <p style={{ color: "var(--color-muted)" }}>Loading...</p>}
 
         {!loading && expenses.length === 0 && (
-          <p className="text-sm text-gray-400">No expenses yet</p>
+          <p style={{ color: "var(--color-muted)" }}>No expenses yet</p>
         )}
 
         <div className="space-y-2">
           {expenses.map((e) => (
             <div
               key={e._id}
-              className="flex justify-between border p-2 rounded"
+              className="flex justify-between p-3 rounded border"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-bg)",
+              }}
             >
               <div>
                 <p className="font-bold">₱ {e.amount}</p>
-                <p className="text-xs">{e.category}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+                  {e.category}
+                </p>
+
+                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
                   {new Date(e.date).toLocaleDateString()} |{" "}
                   {e.note == "" ? "No note" : e.note.toUpperCase()}
                 </p>
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => startEdit(e)} className="text-blue-500">
+                <button
+                  onClick={() => startEdit(e)}
+                  style={{ color: "var(--color-primary)" }}
+                >
                   Edit
                 </button>
 
                 <button
                   onClick={() => handleDelete(e._id)}
-                  className="text-red-500"
+                  style={{ color: "#ef4444" }}
                 >
                   Delete
                 </button>
