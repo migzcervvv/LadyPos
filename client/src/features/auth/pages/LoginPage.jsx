@@ -8,6 +8,7 @@ function LoginPage() {
   const { login, isLoading, error } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
@@ -18,10 +19,10 @@ function LoginPage() {
       alert("Please enter both identifier and password");
       return;
     }
-    const success = await login({ identifier, password });
+    const success = await login({ identifier, password, remember });
     setShowPassword(false);
 
-    if (success) navigate("/");
+    if (success) navigate("/pos");
   };
 
   return (
@@ -79,7 +80,12 @@ function LoginPage() {
           {/* Remember Me */}
           <div className="flex items-center justify-between text-sm">
             <label className="flex items-center gap-2 text-muted">
-              <input type="checkbox" className="accent-(--color-accent)" />
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="accent-(--color-accent)"
+              />
               Remember me
             </label>
 

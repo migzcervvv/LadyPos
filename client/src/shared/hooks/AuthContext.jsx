@@ -21,8 +21,11 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const storedJwt = localStorage.getItem("jwt");
-    const storedUser = localStorage.getItem("user");
+    const storedUser =
+      localStorage.getItem("user") || sessionStorage.getItem("user");
+
+    const storedJwt =
+      localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
 
     if (storedJwt && storedUser && storedUser !== "undefined") {
       try {
@@ -39,7 +42,7 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  const login = async ({ identifier, password }) => {
+  const login = async ({ identifier, password, remember }) => {
     setIsLoading(true);
 
     try {
@@ -58,8 +61,13 @@ export function AuthProvider({ children }) {
       setJwt(data.token);
       setUser(userData);
 
-      localStorage.setItem("jwt", data.token);
-
+      if (remember) {
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("jwt", data.token);
+      } else {
+        sessionStorage.setItem("user", JSON.stringify(userData));
+        sessionStorage.setItem("jwt", data.token);
+      }
       return data;
     } catch (err) {
       setJwt(null);
@@ -75,6 +83,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.clear();
+    sessionStorage.clear();
     setJwt(null);
     setUser(null);
   };

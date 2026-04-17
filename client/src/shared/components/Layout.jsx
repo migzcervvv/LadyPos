@@ -12,7 +12,7 @@ export default function Layout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // ✅ Sidebar state
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ✅ Sync on resize
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function Layout() {
       {isMobile && sidebarOpen && (
         <div
           className={`fixed inset-0 z-30 backdrop-blur-sm transition-opacity duration-300
-${sidebarOpen ? "bg-black/40 opacity-100" : "opacity-0 pointer-events-none"}`}
+            ${sidebarOpen ? "bg-black/40 opacity-100" : "opacity-0 pointer-events-none"}`}
           onClick={() => setSidebarOpen(false)}
         />
       )}

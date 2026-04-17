@@ -31,10 +31,6 @@ const router = createBrowserRouter([
         element: <Layout />, // 👈 shared layout
         children: [
           {
-            path: "/",
-            element: <div>Dashboard</div>,
-          },
-          {
             path: "/profile",
             element: <ProfilePage />,
           },
