@@ -1,5 +1,5 @@
 // src/app/App.jsx
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
 import RegisterPage from "../features/auth/pages/RegisterPage.jsx";
 import Layout from "../shared/components/Layout.jsx";
@@ -16,6 +16,10 @@ import { LoadingScreen } from "../shared/components/LoadingScreen.jsx";
 import { useServerReady } from "../shared/utils/useServerReady.js";
 
 const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Navigate to="/login" replace />,
+  },
   {
     path: "/login",
     element: <LoginPage />,
