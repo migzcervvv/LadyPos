@@ -10,17 +10,22 @@ export default function ExpensePage() {
   const [note, setNote] = useState("");
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [itemName, setItemName] = useState("");
   const [editingId, setEditingId] = useState(null);
+
   useEffect(() => {
     loadExpenses();
   }, []);
+
   const startEdit = (expense) => {
     setEditingId(expense._id);
+    setItemName(expense.itemName);
     setAmount(expense.amount);
     setCategory(expense.category);
     setNote(expense.note || "");
     setDate(expense.date ? expense.date.substring(0, 10) : "");
   };
+
   const loadExpenses = async () => {
     setLoading(true);
     try {
@@ -39,6 +44,7 @@ export default function ExpensePage() {
 
     try {
       await updateExpense(editingId, {
+        itemName,
         amount,
         category,
         note,
@@ -51,13 +57,16 @@ export default function ExpensePage() {
       console.error("Update failed:", err);
     }
   };
+
   const resetForm = () => {
     setAmount("");
+    setItemName("");
     setCategory("misc");
     setNote("debit");
     setDate("");
     setEditingId(null);
   };
+
   const addExpense = async (e) => {
     e.preventDefault();
 
@@ -65,12 +74,13 @@ export default function ExpensePage() {
 
     try {
       await createExpense({
+        itemName,
         amount,
         category,
         note,
         date: date || undefined, // 👈 important
       });
-
+      setItemName("");
       setAmount("");
       setDate("");
       loadExpenses();
@@ -113,6 +123,13 @@ export default function ExpensePage() {
           onSubmit={editingId ? handleUpdate : addExpense}
           className="flex gap-2 flex-wrap"
         >
+          <input
+            type="text"
+            placeholder="Item Name"
+            value={itemName}
+            onChange={(e) => setItemName(e.target.value)}
+            className="input"
+          />
           <input
             type="number"
             placeholder="Amount"
@@ -186,9 +203,9 @@ export default function ExpensePage() {
               }}
             >
               <div>
-                <p className="font-bold">₱ {e.amount}</p>
+                <p className="font-bold">{e.itemName}</p>
                 <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-                  {e.category}
+                  {e.category} : ₱ {e.amount}
                 </p>
 
                 <p className="text-xs" style={{ color: "var(--color-muted)" }}>

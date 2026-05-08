@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 export const createExpense = async (req, res) => {
   try {
-    const { amount, category, note, date } = req.body;
+    const { itemName, amount, category, note, date } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
@@ -11,6 +11,7 @@ export const createExpense = async (req, res) => {
 
     const expense = new Expense({
       userId: req.user.id, // ✅ REQUIRED
+      itemName,
       amount,
       category,
       note,
@@ -73,8 +74,8 @@ export const updateExpense = async (req, res) => {
     }
 
     // ✅ Update fields safely
-    const { amount, category, note, date } = req.body;
-
+    const { amount, category, note, date, itemName } = req.body;
+    if (itemName) expense.itemName = itemName;
     if (amount !== undefined) expense.amount = amount;
     if (category) expense.category = category;
     if (note !== undefined) expense.note = note;

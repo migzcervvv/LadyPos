@@ -4,7 +4,7 @@ const Schema = _Schema;
 
 const expenseSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
+  itemName: { type: String, required: true },
   amount: { type: Number, required: true },
   category: {
     type: String,
