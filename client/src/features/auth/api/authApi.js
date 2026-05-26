@@ -43,3 +43,29 @@ export const getUsers = async (jwt) => {
   const response = await axios.get(`${API_URL}/users`, authHeader(jwt));
   return response.data;
 };
+
+export const getProfile = (jwt) =>
+  axios.get(`${API_URL}/users/profile`, authHeader(jwt)).then((r) => r.data);
+
+export const updateProfile = (payload, jwt) =>
+  axios
+    .put(`${API_URL}/users/profile`, payload, authHeader(jwt))
+    .then((r) => r.data);
+
+export const updatePassword = (payload, jwt) =>
+  axios
+    .put(`${API_URL}/users/password`, payload, authHeader(jwt))
+    .then((r) => r.data);
+
+export const createUser = (payload, jwt) =>
+  axios
+    .post(`${API_URL}/users/register`, payload, authHeader(jwt))
+    .then((r) => r.data);
+
+export const adminUpdateUser = (id, payload, jwt) =>
+  axios
+    .put(`${API_URL}/users/${id}`, payload, authHeader(jwt))
+    .then((r) => r.data);
+
+export const adminDeleteUser = (id, jwt) =>
+  axios.delete(`${API_URL}/users/${id}`, authHeader(jwt)).then((r) => r.data);

@@ -1,28 +1,31 @@
-import { Router } from 'express';
-import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+// backend/routes/userRoutes.js
+import { Router } from "express";
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import {
-    createUser,
-    loginUser,
-    getUsers,
-    getUserById,
-    updateUser,
-    deleteUser
-} from '../controllers/UserController.js';
+  createUser,
+  loginUser,
+  getProfile,
+  updateProfile,
+  updatePassword,
+  getUsers,
+  updateUser,
+  deleteUser,
+} from "../controllers/userController.js";
 
 const router = Router();
 
-// Public
-router.post('/register', createUser);
-router.post('/login', loginUser);
+// ─── Public ──────────────────────────────────────────────────────────────────
+router.post("/register", createUser);
+router.post("/login", loginUser);
 
-// Admin only
-router.get('/', protect, authorizeRoles('admin'), getUsers);
+// ─── Self — MUST be registered before /:id ───────────────────────────────────
+router.get("/profile", protect, getProfile);
+router.put("/profile", protect, updateProfile);
+router.put("/password", protect, updatePassword);
 
-// Logged-in user OR admin
-router.get('/:id', protect, getUserById);
-router.put('/:id', protect, updateUser);
-
-// Admin only
-router.delete('/:id', protect, authorizeRoles('admin'), deleteUser);
+// ─── Admin ───────────────────────────────────────────────────────────────────
+router.get("/", protect, authorizeRoles("admin"), getUsers);
+router.put("/:id", protect, authorizeRoles("admin"), updateUser);
+router.delete("/:id", protect, authorizeRoles("admin"), deleteUser);
 
 export default router;
