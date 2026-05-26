@@ -1,53 +1,49 @@
-import { Schema as _Schema, model } from "mongoose";
-const Schema = _Schema;
+import mongoose from "mongoose";
 
-const debtSchema = new Schema(
+const { Schema, model } = mongoose;
+
+const customerSchema = new Schema(
   {
-    kind: {
-      type: String,
-      enum: ["charge", "payment"],
-      required: true,
-    },
-
-    context: {
-      type: String,
-      enum: ["order", "debt", "adjustment"],
-      required: true,
-    },
-
-    amount: {
-      type: Number,
-      required: true,
-    },
-
-    orderId: {
-      type: Schema.Types.ObjectId,
-      ref: "Order",
-    },
-
-    paymentMethod: {
-      type: String,
-      default: "Cash",
-    },
-
-    notes: String,
-
-    date: {
-      type: Date,
-      default: Date.now,
-    },
+    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    name: { type: String, required: true, trim: true },
+    phone: { type: String, default: "", trim: true },
+    email: { type: String, default: "", trim: true },
+    address: { type: String, default: "", trim: true },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: Date,
   },
-  { _id: true },
-);
-const personSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    name: { type: String, required: true },
-    contactInfo: { type: String },
-    debts: [debtSchema],
-    notes: { type: String },
+    timestamps: { createdAt: true, updatedAt: true },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
-  { timestamps: true },
 );
 
-export default model("Person", personSchema);
+customerSchema.virtual("userId").get(function getUserId() {
+  return this.owner;
+});
+
+customerSchema.virtual("contactInfo").get(function getContactInfo() {
+  return this.phone;
+});
+
+customerSchema.virtual("contactInfo").set(function setContactInfo(value) {
+  this.phone = value;
+});
+
+customerSchema.virtual("totalDebt").get(function getTotalDebt() {
+  return this.summary?.totalDebt ?? 0;
+});
+
+customerSchema.virtual("totalPaid").get(function getTotalPaid() {
+  return this.summary?.totalPaid ?? 0;
+});
+
+customerSchema.virtual("totalOrders").get(function getTotalOrders() {
+  return this.summary?.totalOrders ?? 0;
+});
+
+customerSchema.index({ owner: 1, name: 1 });
+customerSchema.index({ owner: 1, phone: 1 });
+
+export default model("Customer", customerSchema);

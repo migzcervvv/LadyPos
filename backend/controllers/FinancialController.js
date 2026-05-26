@@ -1,221 +1,95 @@
-import Expense from "../models/Expense.js";
-import Order from "../models/Order.js";
-import Person from "../models/Person.js";
-import dayjs from "dayjs";
+import mongoose from "mongoose";
+import Transaction from "../models/Order.js";
+import Customer from "../models/Person.js";
+import { respond, respondError } from "../utils/responseHelpers.js";
 
-export const getFinanceSummary = async (req, res) => {
+const ownerIdFrom = (req) => req.user?._id || req.user?.id;
+
+const groupFormat = (range) => {
+  if (range === "weekly") return "%G-W%V";
+  if (range === "monthly") return "%Y-%m";
+  return "%Y-%m-%d";
+};
+
+export const getSummary = async (req, res) => {
   try {
-    const { range = "daily" } = req.query;
-    const now = dayjs();
-
-    let startDate;
-
-    if (range === "daily") startDate = now.subtract(6, "day");
-    else if (range === "weekly")
-      startDate = now.subtract(7, "week").startOf("week");
-    else if (range === "monthly")
-      startDate = now.subtract(5, "month").startOf("month");
-    else return res.status(400).json({ error: "Invalid range" });
-
-    // =====================
-    // FETCH DATA
-    // =====================
-
-    const orders = await Order.find({
-      userId: req.user.id,
-      date: { $gte: startDate.toDate() },
-    });
-
-    const expenses = await Expense.find({
-      userId: req.user.id,
-      date: { $gte: startDate.toDate() },
-    });
-
-    // ⚠️ Still needed for payments (we'll optimize later if needed)
-    const persons = await Person.find({ userId: req.user.id });
-
-    // =====================
-    // PREPARE MAP
-    // =====================
-
-    const map = {};
-
-    const getKey = (date) => {
-      if (range === "daily") return dayjs(date).format("YYYY-MM-DD");
-      if (range === "weekly")
-        return dayjs(date).startOf("week").format("YYYY-MM-DD");
-      if (range === "monthly")
-        return dayjs(date).startOf("month").format("YYYY-MM-DD");
-    };
-
-    const ensure = (key) => {
-      if (!map[key]) {
-        map[key] = {
-          revenue: 0,
-          cashIn: 0,
-          expenses: 0,
-          debtCreated: 0,
-          debtCollected: 0,
-        };
-      }
-    };
-
-    // =====================
-    // PROCESS ORDERS
-    // =====================
-
-    orders.forEach((o) => {
-      const key = getKey(o.date);
-      ensure(key);
-
-      if (o.paymentStatus === "paid") {
-        map[key].revenue += o.total;
-        map[key].cashIn += o.total;
-      }
-
-      if (o.paymentStatus === "debt") {
-        map[key].debtCreated += o.total;
-      }
-    });
-
-    // =====================
-    // PROCESS PAYMENTS
-    // =====================
-
-    const payments = [];
-
-    persons.forEach((p) => {
-      p.debts.forEach((d) => {
-        if (d.kind === "payment" && d.date >= startDate.toDate()) {
-          payments.push(d);
-        }
-      });
-    });
-
-    payments.forEach((p) => {
-      const key = getKey(p.date);
-      ensure(key);
-
-      map[key].debtCollected += p.amount;
-      map[key].cashIn += p.amount;
-      map[key].revenue += p.amount;
-    });
-
-    // =====================
-    // PROCESS EXPENSES
-    // =====================
-
-    expenses.forEach((e) => {
-      const key = getKey(e.date);
-      ensure(key);
-
-      map[key].expenses += e.amount;
-    });
-
-    // =====================
-    // BUILD BREAKDOWN
-    // =====================
-
-    const breakdown = [];
-
-    const build = (count, unit) => {
-      for (let i = count; i >= 0; i--) {
-        let d = now.subtract(i, unit);
-
-        if (unit === "week") d = d.startOf("week");
-        if (unit === "month") d = d.startOf("month");
-
-        const key = getKey(d);
-        const data = map[key] || {
-          revenue: 0,
-          cashIn: 0,
-          expenses: 0,
-          debtCreated: 0,
-          debtCollected: 0,
-        };
-
-        breakdown.push({
-          label: unit === "month" ? d.format("MMM") : d.format("MMM D"),
-          raw: key,
-          ...data,
-          net: data.revenue - data.expenses,
-        });
-      }
-    };
-
-    if (range === "daily") build(6, "day");
-    if (range === "weekly") build(7, "week");
-    if (range === "monthly") build(5, "month");
-
-    // =====================
-    // RECEIVABLES (KEY FEATURE)
-    // =====================
-
-    let totalOutstanding = 0;
-    let overdue = 0;
-    let notDue = 0;
-
-    const today = dayjs();
-
-    persons.forEach((p) => {
-      let balance = 0;
-
-      p.debts.forEach((d) => {
-        if (d.kind === "charge") balance += d.amount;
-        if (d.kind === "payment") balance -= d.amount;
-      });
-
-      if (balance > 0) {
-        totalOutstanding += balance;
-
-        // simple overdue logic (customize later)
-        const lastDebt = p.debts[p.debts.length - 1];
-        if (
-          lastDebt &&
-          dayjs(lastDebt.date).isBefore(today.subtract(7, "day"))
-        ) {
-          overdue += balance;
-        } else {
-          notDue += balance;
-        }
-      }
-    });
-
-    // =====================
-    // TOTALS
-    // =====================
-
-    const total = breakdown.reduce(
-      (acc, curr) => {
-        acc.revenue += curr.revenue;
-        acc.cashIn += curr.cashIn;
-        acc.expenses += curr.expenses;
-        acc.net += curr.net;
-        acc.debtCreated += curr.debtCreated;
-        acc.debtCollected += curr.debtCollected;
-        return acc;
-      },
+    const owner = new mongoose.Types.ObjectId(ownerIdFrom(req));
+    const [transactionTotals] = await Transaction.aggregate([
+      { $match: { owner, orderStatus: "completed", voidedAt: { $exists: false } } },
       {
-        revenue: 0,
-        cashIn: 0,
-        expenses: 0,
-        net: 0,
-        debtCreated: 0,
-        debtCollected: 0,
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$amountPaid" },
+          totalOutstandingDebt: {
+            $sum: {
+              $cond: [{ $ne: ["$paymentStatus", "paid"] }, "$balance", 0],
+            },
+          },
+          totalOrders: { $sum: 1 },
+        },
       },
-    );
+    ]);
 
-    res.json({
-      total,
-      breakdown,
-      receivables: {
-        total: totalOutstanding,
-        overdue,
-        notDue,
-      },
-      rangeLabel: `${startDate.format("MMM D")} - ${now.format("MMM D")}`,
+    const [totalCustomers, recentTransactions] = await Promise.all([
+      Customer.countDocuments({ owner, isDeleted: { $ne: true } }),
+      Transaction.find({ owner, orderStatus: "completed", voidedAt: { $exists: false } })
+        .populate("customer", "name phone")
+        .sort({ createdAt: -1 })
+        .limit(10),
+    ]);
+
+    respond(res, 200, "Dashboard summary loaded", {
+      totalRevenue: transactionTotals?.totalRevenue || 0,
+      totalOutstandingDebt: transactionTotals?.totalOutstandingDebt || 0,
+      totalOrders: transactionTotals?.totalOrders || 0,
+      totalCustomers,
+      recentTransactions,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 };
+
+export const getRevenueByRange = async (req, res) => {
+  try {
+    const owner = new mongoose.Types.ObjectId(ownerIdFrom(req));
+    const range = req.query.range || "daily";
+    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+
+    const breakdown = await Transaction.aggregate([
+      {
+        $match: {
+          owner,
+          orderStatus: "completed",
+          voidedAt: { $exists: false },
+          createdAt: { $gte: from, $lte: to },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupFormat(range), date: "$createdAt" } },
+          revenue: { $sum: "$amountPaid" },
+          orders: { $sum: 1 },
+          outstandingDebt: { $sum: "$balance" },
+        },
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          label: "$_id",
+          revenue: 1,
+          orders: 1,
+          outstandingDebt: 1,
+        },
+      },
+    ]);
+
+    respond(res, 200, "Revenue breakdown loaded", breakdown);
+  } catch (err) {
+    respondError(res, 500, err.message);
+  }
+};
+
+export const getFinanceSummary = async (req, res) => getSummary(req, res);

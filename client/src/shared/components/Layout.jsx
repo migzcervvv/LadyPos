@@ -6,20 +6,28 @@ import ThemeToggle from "../../services/ThemeToggle.jsx";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const NAV_TABS = [
-  { name: "Profile", path: "/profile" },
+  { name: "POS", path: "/pos" },
   { name: "Customers", path: "/customers" },
-  { name: "Orders", path: "/pos" },
   { name: "Products", path: "/products" },
+  { name: "Dashboard", path: "/dashboard" },
+  { name: "Profile", path: "/profile" },
+  { name: "Orders", path: "/orders" },
   { name: "Invoices", path: "/invoices" },
-  { name: "Finances", path: "/finances" },
   { name: "Expenses", path: "/expenses" },
+];
+
+const MOBILE_TABS = [
+  { name: "POS", path: "/pos", icon: ">" },
+  { name: "Customers", path: "/customers", icon: "C" },
+  { name: "Products", path: "/products", icon: "P" },
+  { name: "Dashboard", path: "/dashboard", icon: "D" },
 ];
 
 const MOBILE_BREAKPOINT = 768;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function NavItem({ name, path, isActive, onClick }) {
+function NavItem({ name, isActive, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -79,7 +87,7 @@ function SidebarContent({
       {/* Nav links */}
       <nav
         aria-label="Main navigation"
-        className="flex-1 overflow-y-auto px-3 py-4 space-y-1"
+        className="overflow-y-auto px-3 py-4 space-y-1"
       >
         {NAV_TABS.map((tab) => (
           <NavItem
@@ -325,10 +333,31 @@ export default function Layout() {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 overflow-y-auto p-3 md:p-4"
+          className="flex-1 overflow-y-auto p-3 pb-24 md:p-4"
         >
           <Outlet />
         </main>
+        {isMobile && (
+          <nav className="mobile-bottom-nav" aria-label="Primary navigation">
+            {MOBILE_TABS.map((tab) => {
+              const active =
+                location.pathname === tab.path ||
+                (tab.path === "/customers" &&
+                  location.pathname.startsWith("/customers/"));
+              return (
+                <button
+                  key={tab.path}
+                  className={active ? "selected" : ""}
+                  onClick={() => handleNavigate(tab.path)}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <span>{tab.icon}</span>
+                  {tab.name}
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </div>
     </div>
   );

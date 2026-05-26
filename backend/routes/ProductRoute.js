@@ -6,6 +6,7 @@ import {
   updateProduct,
   deleteProduct,
   setActiveProducts,
+  adjustStock,
 } from "../controllers/ProductController.js";
 
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
@@ -25,6 +26,7 @@ router
   .put(authorizeRoles("admin", "user"), updateProduct)
   .delete(authorizeRoles("admin", "user"), deleteProduct);
 
+router.patch("/:id/stock", authorizeRoles("admin", "user"), adjustStock);
 router.post("/set-active", protect, setActiveProducts);
 
 export default router;

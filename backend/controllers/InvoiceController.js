@@ -1,161 +1,165 @@
-import Invoice from "../models/Invoice.js";
-import Order from "../models/Order.js";
 import mongoose from "mongoose";
+import Invoice from "../models/Invoice.js";
+import Transaction from "../models/Order.js";
 import InvoiceCounter from "../models/InvoiceCounter.js";
+import { respond, respondError } from "../utils/responseHelpers.js";
 
-// Generate invoice number (per user)
-const generateInvoiceNumber = async (userId) => {
+const ownerIdFrom = (req) => req.user?._id || req.user?.id;
+const pageFrom = (req) => Math.max(1, Number.parseInt(req.query.page ?? 1, 10));
+const limitFrom = (req) =>
+  Math.max(1, Number.parseInt(req.query.limit ?? 20, 10));
+const statusFromPayment = (paymentStatus) => {
+  if (paymentStatus === "paid") return "paid";
+  if (paymentStatus === "partial") return "partial";
+  return "unpaid";
+};
+
+const generateInvoiceNumber = async (owner, session) => {
   const year = new Date().getFullYear();
-  console.log("Generating invoice number for user:", userId, "Year:", year);
   const counter = await InvoiceCounter.findOneAndUpdate(
-    { userId, year },
-    { $inc: { seq: 1 } }, // ✅ ONLY this
-    {
-      upsert: true,
-      returnDocument: "after",
-    },
+    { owner, type: "invoice", year },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true, session },
   );
-
-  if (!counter || typeof counter.seq !== "number") {
-    throw new Error("Failed to generate counter");
-  }
 
   return `INV-${year}-${String(counter.seq).padStart(4, "0")}`;
 };
 
-// Create from Order (SAFE VERSION)
-export const createInvoiceFromOrder = async (orderId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(orderId)) {
-    throw new Error("Invalid order ID");
-  }
-
-  // 🔒 Ensure order belongs to user
-  const order = await Order.findOne({
-    _id: orderId,
-    userId,
-  }).populate("products.productId");
-
-  if (!order) {
-    throw new Error("Order not found or unauthorized");
-  }
-
-  // 🔒 Prevent duplicate per user
+export async function createInvoiceForTransaction(transaction, session = null) {
   const existing = await Invoice.findOne({
-    orderId,
-    userId,
-  });
+    owner: transaction.owner,
+    transaction: transaction._id,
+  }).session(session);
 
   if (existing) return existing;
 
-  const items = order.products.map((p) => ({
-    productName: p.productId?.name || "Unknown Product",
-    quantity: p.quantity,
-    price: p.price,
-    total: p.quantity * p.price,
-  }));
-
-  const subtotal = items.reduce((sum, i) => sum + i.total, 0);
-  const tax = 0;
-  const total = subtotal + tax;
-
-  // 🔁 Retry mechanism for race conditions
-  let attempts = 0;
-  let invoice;
-
-  while (attempts < 3) {
-    try {
-      const invoiceNumber = await generateInvoiceNumber(userId);
-
-      invoice = new Invoice({
-        userId,
+  const invoiceNumber = await generateInvoiceNumber(transaction.owner, session);
+  const [invoice] = await Invoice.create(
+    [
+      {
+        owner: transaction.owner,
+        customer: transaction.customer,
+        transaction: transaction._id,
         invoiceNumber,
-        orderId,
-        customer: order.customer,
-        items,
-        subtotal,
-        tax,
-        total,
-        status: "completed",
-      });
+        dueDate:
+          transaction.balance > 0
+            ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            : null,
+        status: statusFromPayment(transaction.paymentStatus),
+      },
+    ],
+    { session },
+  );
 
-      await invoice.save();
-      return invoice;
-    } catch (err) {
-      if (err.code === 11000) {
-        // Duplicate key → retry
-        attempts++;
-        continue;
-      }
-      throw err;
-    }
+  return invoice;
+}
+
+export const createInvoiceFromOrder = async (reqOrOrderId, resOrUserId) => {
+  if (typeof reqOrOrderId === "object" && reqOrOrderId.params) {
+    const req = reqOrOrderId;
+    const res = resOrUserId;
+    return getOrCreateInvoice(req, res);
   }
 
-  throw new Error("Failed to generate unique invoice number");
+  const transaction = await Transaction.findOne({
+    _id: reqOrOrderId,
+    owner: resOrUserId,
+  });
+  if (!transaction) throw new Error("Transaction not found or unauthorized");
+  return createInvoiceForTransaction(transaction);
 };
 
-// GET invoices
 export const getInvoices = async (req, res) => {
   try {
-    const { status, from, to, search } = req.query;
+    const owner = ownerIdFrom(req);
+    const page = pageFrom(req);
+    const limit = limitFrom(req);
+    const filter = { owner };
 
-    let filter = {
-      userId: req.user.id,
-    };
-
-    if (status) {
-      filter.status = status;
-    }
-
-    if (from || to) {
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.customer) filter.customer = req.query.customer;
+    if (req.query.from || req.query.to) {
       filter.issuedAt = {};
-      if (from) filter.issuedAt.$gte = new Date(from);
-      if (to) filter.issuedAt.$lte = new Date(to);
+      if (req.query.from) filter.issuedAt.$gte = new Date(req.query.from);
+      if (req.query.to) filter.issuedAt.$lte = new Date(req.query.to);
     }
 
-    // 🔍 Optional search (invoice number / customer name)
-    if (search) {
-      filter.$or = [
-        { invoiceNumber: { $regex: search, $options: "i" } },
-        { "customer.name": { $regex: search, $options: "i" } },
-      ];
-    }
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter)
+        .populate("customer", "name phone address")
+        .populate({
+          path: "transaction",
+          populate: { path: "items.product", select: "name sku price" },
+        })
+        .sort({ issuedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
 
-    const invoices = await Invoice.find(filter)
-      .sort({ issuedAt: -1 })
-      .limit(100);
-
-    res.json(invoices);
+    respond(res, 200, "Invoices loaded", invoices, {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 };
 
-// GET or CREATE invoice (SAFE)
+export const getInvoiceById = async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({
+      _id: req.params.id,
+      owner: ownerIdFrom(req),
+    })
+      .populate("customer", "name phone email address")
+      .populate({
+        path: "transaction",
+        populate: { path: "items.product", select: "name sku price" },
+      });
+
+    if (!invoice) return respondError(res, 404, "Invoice not found");
+    respond(res, 200, "Invoice loaded", invoice);
+  } catch (err) {
+    respondError(res, 500, err.message);
+  }
+};
+
 export const getOrCreateInvoice = async (req, res) => {
   try {
-    const { orderId } = req.params;
-    console.log("Ensuring invoice for order:", orderId, "User:", req.user.id);
+    const owner = ownerIdFrom(req);
+    const transactionId = req.params.orderId || req.params.transactionId;
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ error: "Invalid order ID" });
+    if (!mongoose.Types.ObjectId.isValid(transactionId)) {
+      return respondError(res, 400, "Invalid transaction ID");
     }
 
-    // 🔒 Always scope by user
-    let invoice = await Invoice.findOne({
-      orderId,
-      userId: req.user.id,
+    const transaction = await Transaction.findOne({
+      _id: transactionId,
+      owner,
     });
+    if (!transaction) return respondError(res, 404, "Transaction not found");
 
-    if (!invoice) {
-      invoice = await createInvoiceFromOrder(orderId, req.user.id);
-    }
-
-    res.json(invoice);
+    const invoice = await createInvoiceForTransaction(transaction);
+    respond(res, 200, "Invoice loaded", invoice);
   } catch (err) {
-    if (err.message.includes("unauthorized")) {
-      return res.status(403).json({ error: err.message });
-    }
+    respondError(res, 500, err.message);
+  }
+};
 
-    res.status(500).json({ error: err.message });
+export const markVoid = async (req, res) => {
+  try {
+    const invoice = await Invoice.findOneAndUpdate(
+      { _id: req.params.id, owner: ownerIdFrom(req) },
+      { status: "void" },
+      { new: true },
+    );
+
+    if (!invoice) return respondError(res, 404, "Invoice not found");
+    respond(res, 200, "Invoice voided", invoice);
+  } catch (err) {
+    respondError(res, 500, err.message);
   }
 };

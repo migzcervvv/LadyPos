@@ -1,41 +1,156 @@
-import { Schema as _Schema, model } from "mongoose";
-const Schema = _Schema;
+import mongoose from "mongoose";
+import Invoice from "./Invoice.js";
 
-const orderProductSchema = new Schema({
-  productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
-  quantity: { type: Number, required: true },
-  price: { type: Number, required: true }, // store product price at time of purchase
+const { Schema, model } = mongoose;
+
+const transactionItemSchema = new Schema(
+  {
+    product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    unitPrice: { type: Number, required: true, min: 0 },
+    subtotal: { type: Number, required: true, min: 0 },
+  },
+  {
+    _id: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
+);
+
+transactionItemSchema.virtual("productId").get(function getProductId() {
+  return this.product;
 });
 
-const orderSchema = new Schema(
+transactionItemSchema.virtual("price").get(function getPrice() {
+  return this.unitPrice;
+});
+
+const transactionSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    personId: { type: Schema.Types.ObjectId, ref: "Person", required: false },
-    products: [orderProductSchema],
-    total: { type: Number, required: true },
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    customer: {
+      type: Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true,
+      index: true,
+    },
+    items: [transactionItemSchema],
+    totalAmount: { type: Number, required: true, min: 0 },
+    amountPaid: { type: Number, default: 0, min: 0 },
+    balance: { type: Number, default: 0, min: 0 },
+    paymentStatus: {
+      type: String,
+      enum: ["paid", "partial", "debt"],
+      default: "debt",
+      index: true,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "gcash", "bank", "credit"],
+      default: "cash",
+    },
+    paymentReference: { type: String, default: "", trim: true },
     customerType: {
       type: String,
       enum: ["walkin", "customer", "grab", "foodpanda"],
-      default: "walkin",
+      default: "customer",
     },
-    paymentStatus: {
-      type: String,
-      enum: ["paid", "debt"],
-      default: "debt",
-    },
+    reference: { type: String, default: "", trim: true },
     orderStatus: {
       type: String,
-      enum: ["pending", "completed"],
-      default: "pending",
+      enum: ["pending", "completed", "void"],
+      default: "completed",
+      index: true,
     },
-    reference: { type: String, required: false }, // for external orders
-    date: { type: Date, default: Date.now },
-    paymentMethod: { type: String, default: "Cash" },
-    notes: { type: String },
-    // Prevent double-processing ledger entries
-    ledgerRecorded: { type: Boolean, default: false },
+    ledgerRecorded: { type: Boolean, default: false, index: true },
+    completedAt: Date,
+    processedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    notes: { type: String, default: "" },
+    voidedAt: Date,
+    voidReason: String,
+    createdAt: { type: Date, default: Date.now, index: true },
   },
-  { timestamps: true },
+  {
+    timestamps: { createdAt: false, updatedAt: true },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
 );
 
-export default model("Order", orderSchema);
+transactionSchema.virtual("userId").get(function getUserId() {
+  return this.owner;
+});
+
+transactionSchema.virtual("personId").get(function getPersonId() {
+  return this.customer;
+});
+
+transactionSchema.virtual("products").get(function getProducts() {
+  return this.items;
+});
+
+transactionSchema.virtual("total").get(function getTotal() {
+  return this.totalAmount;
+});
+
+transactionSchema.virtual("date").get(function getDate() {
+  return this.createdAt;
+});
+
+transactionSchema.pre("validate", function deriveTotals(next) {
+  this.items = (this.items || []).map((item) => {
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice ?? item.price) || 0;
+    item.quantity = quantity;
+    item.unitPrice = unitPrice;
+    item.subtotal = Number(item.subtotal ?? quantity * unitPrice);
+    return item;
+  });
+
+  this.totalAmount = this.items.reduce((sum, item) => sum + item.subtotal, 0);
+  this.amountPaid = Math.max(
+    0,
+    Math.min(Number(this.amountPaid) || 0, this.totalAmount),
+  );
+  this.balance = Math.max(0, this.totalAmount - this.amountPaid);
+
+  if (this.orderStatus === "completed") {
+    if (this.balance <= 0) this.paymentStatus = "paid";
+    else if (this.amountPaid > 0) this.paymentStatus = "partial";
+    else this.paymentStatus = "debt";
+  }
+
+  return;
+});
+
+transactionSchema.post("save", async function syncInvoiceStatus(doc) {
+  if (doc.orderStatus !== "completed" && !doc.voidedAt) return;
+
+  const statusMap = { paid: "paid", partial: "partial", debt: "unpaid" };
+  const status =
+    doc.voidedAt || doc.orderStatus === "void"
+      ? "void"
+      : statusMap[doc.paymentStatus];
+
+  const sess = doc.$session();
+  await Invoice.updateOne(
+    { owner: doc.owner, transaction: doc._id },
+    { $set: { status } },
+    ...(sess ? [{ session: sess }] : []),
+  );
+});
+
+transactionSchema.index({
+  owner: 1,
+  customer: 1,
+  createdAt: -1,
+  paymentStatus: 1,
+});
+transactionSchema.index({ owner: 1, createdAt: -1 });
+
+export default model("Transaction", transactionSchema);

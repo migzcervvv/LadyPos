@@ -1,312 +1,576 @@
-import Order from "../models/Order.js";
-import Person from "../models/Person.js";
 import mongoose from "mongoose";
-import { createInvoiceFromOrder } from "./InvoiceController.js";
+import Transaction from "../models/Order.js";
+import Customer from "../models/Person.js";
+import Product from "../models/Product.js";
+import Invoice from "../models/Invoice.js";
+import DebtPayment from "../models/DebtPayment.js";
+import { createInvoiceForTransaction } from "./InvoiceController.js";
+import { respond, respondError } from "../utils/responseHelpers.js";
 
-//
-// 🔥 HELPER: Add transaction to person
-//
-async function addTransaction({
-  personId,
-  kind,
-  context,
-  amount,
-  orderId,
-  paymentMethod,
-  notes,
-  session,
-}) {
-  if (!personId) return;
+const ownerIdFrom = (req) => req.user?._id || req.user?.id;
+const pageFrom = (req) => Math.max(1, Number.parseInt(req.query.page ?? 1, 10));
+const limitFrom = (req) =>
+  Math.max(1, Number.parseInt(req.query.limit ?? 50, 10));
+const money = (value) => Math.round(Number(value) || 0);
+const normalizeMethod = (value) => String(value || "cash").toLowerCase();
+const allowedMethods = ["cash", "gcash", "bank", "credit"];
 
-  await Person.findByIdAndUpdate(
-    personId,
-    {
-      $push: {
-        debts: {
-          kind,
-          context,
-          amount,
-          orderId,
-          paymentMethod,
-          notes,
-          date: new Date(),
-        },
-      },
-    },
-    { session },
-  );
+const normalizeCart = (body) => body.items || body.products || [];
+
+function logOrder(event, payload) {
+  console.log(`[orders:${event}] ${JSON.stringify(payload)}`);
 }
 
-//
-// CREATE ORDER
-//
-export async function createOrder(req, res) {
+async function getOrCreateWalkInCustomer(owner, session) {
+  const existing = await Customer.findOne({
+    owner,
+    name: "Walk-in",
+    phone: "",
+    isDeleted: { $ne: true },
+  }).session(session);
+
+  if (existing) return existing;
+
+  const [customer] = await Customer.create(
+    [{ owner, name: "Walk-in", phone: "" }],
+    { session },
+  );
+  return customer;
+}
+
+async function resolveCustomer({
+  owner,
+  customerId,
+  customerType,
+  paymentStatus,
+  session,
+}) {
+  if (mongoose.Types.ObjectId.isValid(customerId)) {
+    const customer = await Customer.findOne({
+      _id: customerId,
+      owner,
+      isDeleted: { $ne: true },
+    }).session(session);
+    if (!customer) throw new Error("Customer not found for this account");
+    return customer;
+  }
+
+  if (paymentStatus === "debt" || paymentStatus === "partial") {
+    throw new Error("Debt or partial sales require a selected customer");
+  }
+
+  if (customerType && customerType !== "walkin") {
+    throw new Error("Non-walk-in orders require a selected customer");
+  }
+
+  return getOrCreateWalkInCustomer(owner, session);
+}
+
+async function buildItems(cart, owner, session) {
+  if (!Array.isArray(cart) || cart.length === 0)
+    throw new Error("Cart is required");
+
+  const quantities = new Map();
+  for (const line of cart) {
+    const productId = line.product || line.productId;
+    const quantity = Number.parseInt(line.quantity ?? 0, 10);
+    if (!mongoose.Types.ObjectId.isValid(productId) || quantity <= 0) {
+      throw new Error("Every cart item needs a valid product and quantity");
+    }
+    quantities.set(
+      productId.toString(),
+      (quantities.get(productId.toString()) || 0) + quantity,
+    );
+  }
+
+  const products = await Product.find({
+    _id: { $in: [...quantities.keys()] },
+    owner,
+    isActive: true,
+  }).session(session);
+
+  if (products.length !== quantities.size)
+    throw new Error("One or more products are unavailable");
+
+  return products.map((product) => {
+    const quantity = quantities.get(product._id.toString());
+    return {
+      product: product._id,
+      quantity,
+      unitPrice: product.price,
+      subtotal: product.price * quantity,
+    };
+  });
+}
+
+function completionPayload(body, totalAmount) {
+  const paymentMethod = normalizeMethod(body.paymentMethod);
+  if (!allowedMethods.includes(paymentMethod)) {
+    throw new Error("Payment method must be cash, gcash, bank, or credit");
+  }
+
+  const requestedStatus =
+    body.paymentStatus || (paymentMethod === "credit" ? "debt" : "paid");
+  let amountPaid = money(body.amountPaid);
+
+  if (requestedStatus === "paid") amountPaid = totalAmount;
+  if (requestedStatus === "debt") amountPaid = 0;
+  if (
+    requestedStatus === "partial" &&
+    (amountPaid <= 0 || amountPaid >= totalAmount)
+  ) {
+    throw new Error(
+      "Partial payments must be greater than zero and less than the total",
+    );
+  }
+
+  if (
+    ["gcash", "bank"].includes(paymentMethod) &&
+    amountPaid > 0 &&
+    !String(body.paymentReference || "").trim()
+  ) {
+    throw new Error("Reference number is required for GCash and bank payments");
+  }
+
+  return {
+    amountPaid,
+    paymentMethod,
+    paymentReference: String(
+      body.paymentReference || body.referenceNumber || "",
+    ).trim(),
+  };
+}
+
+async function decrementStock(items, owner, session) {
+  for (const item of items) {
+    const result = await Product.updateOne(
+      { _id: item.product, owner, stock: { $gte: item.quantity } },
+      { $inc: { stock: -item.quantity } },
+      { session },
+    );
+
+    if (result.modifiedCount !== 1) {
+      const product = await Product.findOne({
+        _id: item.product,
+        owner,
+      }).session(session);
+      throw new Error(`${product?.name || "Product"} has insufficient stock`);
+    }
+  }
+}
+
+async function completeTransaction(transaction, body, processedBy, session) {
+  if (transaction.orderStatus === "completed" && transaction.ledgerRecorded) {
+    logOrder("duplicate-complete", {
+      orderId: transaction._id,
+      owner: transaction.owner,
+      paymentStatus: transaction.paymentStatus,
+    });
+    const invoice = await createInvoiceForTransaction(transaction, session);
+    return { transaction, invoice, duplicate: true };
+  }
+
+  const payment = completionPayload(body, transaction.totalAmount);
+
+  await decrementStock(transaction.items, transaction.owner, session);
+  logOrder("stock-decremented", {
+    orderId: transaction._id,
+    items: transaction.items.length,
+  });
+
+  transaction.amountPaid = payment.amountPaid;
+  transaction.paymentMethod = payment.paymentMethod;
+  transaction.paymentReference = payment.paymentReference;
+  transaction.orderStatus = "completed";
+  transaction.completedAt = new Date();
+  transaction.processedBy = processedBy;
+  transaction.ledgerRecorded = true;
+  transaction.notes = body.notes ?? transaction.notes;
+
+  await transaction.save({ session });
+  logOrder("order-completed", {
+    orderId: transaction._id,
+    owner: transaction.owner,
+    paymentStatus: transaction.paymentStatus,
+    amountPaid: transaction.amountPaid,
+    balance: transaction.balance,
+  });
+
+  const invoice = await createInvoiceForTransaction(transaction, session);
+  logOrder("invoice-ready", {
+    orderId: transaction._id,
+    invoiceId: invoice._id,
+    invoiceNumber: invoice.invoiceNumber,
+  });
+
+  return { transaction, invoice, duplicate: false };
+}
+
+export async function createTransaction(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const {
-      products,
-      personId,
-      paymentStatus,
+    const owner = ownerIdFrom(req);
+    const body = req.body;
+
+    // Normalize order status — only allow two valid states at creation
+    const orderStatus =
+      body.orderStatus === "pending" ? "pending" : "completed";
+
+    // Derive customerType defensively
+    const customerType =
+      body.customerType ||
+      (body.customer || body.personId ? "customer" : "walkin");
+
+    // Resolve or create customer document
+    const customer = await resolveCustomer({
+      owner,
+      customerId: body.customer || body.personId,
       customerType,
-      reference,
-      paymentMethod,
-      notes,
-    } = req.body;
-
-    const userId = req.user.id;
-
-    // ✅ validate
-    if (!products || !products.length) {
-      throw new Error("Products are required");
-    }
-
-    const total = products.reduce((sum, p) => {
-      return sum + (Number(p.price) || 0) * (Number(p.quantity) || 0);
-    }, 0);
-
-    if (total <= 0) throw new Error("Invalid total");
-
-    // ✅ create order
-    const order = new Order({
-      userId,
-      personId:
-        personId && mongoose.Types.ObjectId.isValid(personId) ? personId : null,
-      products,
-      total,
-      paymentStatus,
-      customerType,
-      reference,
-      paymentMethod,
-      notes,
-      orderStatus: "pending",
-      ledgerRecorded: false,
+      session,
     });
 
-    await order.save({ session });
+    // Build validated line items
+    const items = await buildItems(normalizeCart(body), owner, session);
 
-    await session.commitTransaction();
-    session.endSession();
+    // Totals derived here are re-derived by pre-validate; kept for invoice downstream
+    const totalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
-    res.json(order);
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
+    // Clamp amountPaid: must be numeric, non-negative, cannot exceed total
+    const amountPaid = Math.max(
+      0,
+      Math.min(Number(body.amountPaid) || 0, totalAmount),
+    );
 
-    console.error("Create Order Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-}
+    const [transaction] = await Transaction.create(
+      [
+        {
+          owner,
+          customer: customer._id,
+          items,
+          totalAmount, // pre-validate will recompute — consistent either way
+          amountPaid, // pre-validate will clamp again — safe
+          paymentMethod: normalizeMethod(body.paymentMethod),
+          paymentReference: body.paymentReference?.trim() || "",
+          customerType,
+          reference: body.reference?.trim() || "",
+          orderStatus,
+          processedBy: owner,
+          notes: body.notes?.trim() || "",
+          ledgerRecorded: false,
+        },
+      ],
+      { session },
+    );
 
-//
-// GET ORDERS
-//
-export async function getOrders(req, res) {
-  try {
-    const orders = await Order.find({ userId: req.user.id })
-      .populate("products.productId")
-      .populate("personId", "name")
-      .sort({ createdAt: -1 });
+    let invoice = null;
 
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
-
-//
-// GET SINGLE ORDER
-//
-export async function getOrderById(req, res) {
-  try {
-    const order = await Order.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    })
-      .populate("products.productId")
-      .populate("personId", "name");
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
+    if (orderStatus === "completed") {
+      ({ invoice } = await completeTransaction(
+        transaction,
+        body,
+        owner,
+        session,
+      ));
+    } else {
+      logOrder("order-created-pending", {
+        orderId: transaction._id,
+        owner,
+        totalAmount,
+      });
     }
 
-    res.json(order);
+    await session.commitTransaction();
+
+    // Populate after commit — session is no longer needed
+    await transaction.populate("items.product", "name sku price stock");
+    await transaction.populate("customer", "name phone");
+
+    return respond(
+      res,
+      201,
+      orderStatus === "completed" ? "Sale submitted" : "Pending order created",
+      {
+        transaction,
+        invoice,
+        invoiceNumber: invoice?.invoiceNumber ?? null,
+      },
+    );
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    await session.abortTransaction();
+    logOrder("create-failed", {
+      message: err.message,
+      stack: err.stack,
+      owner: ownerIdFrom(req),
+    });
+    return respondError(res, 400, err.message);
+  } finally {
+    session.endSession();
   }
 }
 
-//
-// UPDATE ORDER
-//
+export const createOrder = createTransaction;
+
+export async function getTransactions(req, res) {
+  try {
+    const owner = ownerIdFrom(req);
+    const page = pageFrom(req);
+    const limit = limitFrom(req);
+    const filter = { owner, voidedAt: { $exists: false } };
+
+    if (req.query.orderStatus) filter.orderStatus = req.query.orderStatus;
+    if (req.query.customer) filter.customer = req.query.customer;
+    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
+    if (req.query.paymentMethod)
+      filter.paymentMethod = normalizeMethod(req.query.paymentMethod);
+    if (req.query.from || req.query.to) {
+      filter.createdAt = {};
+      if (req.query.from) filter.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to) filter.createdAt.$lte = new Date(req.query.to);
+    }
+
+    const sortDirection = req.query.sort === "asc" ? 1 : -1;
+    const [transactions, total] = await Promise.all([
+      Transaction.find(filter)
+        .populate("customer", "name phone")
+        .populate("processedBy", "name email identifier")
+        .populate("items.product", "name sku")
+        .sort({ createdAt: sortDirection })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Transaction.countDocuments(filter),
+    ]);
+
+    const invoices = await Invoice.find({
+      owner,
+      transaction: { $in: transactions.map((transaction) => transaction._id) },
+    });
+    const invoiceByTransaction = new Map(
+      invoices.map((invoice) => [invoice.transaction.toString(), invoice]),
+    );
+
+    respond(
+      res,
+      200,
+      "Orders loaded",
+      transactions.map((transaction) => ({
+        ...transaction.toObject(),
+        personId: transaction.customer,
+        invoice: invoiceByTransaction.get(transaction._id.toString()) || null,
+      })),
+      { page, limit, total, pages: Math.ceil(total / limit) },
+    );
+  } catch (err) {
+    respondError(res, 500, err.message);
+  }
+}
+
+export const getOrders = getTransactions;
+
+export async function getTransactionById(req, res) {
+  try {
+    const owner = ownerIdFrom(req);
+    const transaction = await Transaction.findOne({ _id: req.params.id, owner })
+      .populate("customer", "name phone email address")
+      .populate("processedBy", "name email identifier")
+      .populate("items.product", "name sku price");
+
+    if (!transaction) return respondError(res, 404, "Order not found");
+
+    const [invoice, payments] = await Promise.all([
+      Invoice.findOne({ owner, transaction: transaction._id }),
+      DebtPayment.find({ owner, transaction: transaction._id }).sort({
+        paidAt: -1,
+      }),
+    ]);
+
+    respond(res, 200, "Order loaded", { transaction, invoice, payments });
+  } catch (err) {
+    respondError(res, 500, err.message);
+  }
+}
+
+export const getOrderById = getTransactionById;
+
 export async function updateOrder(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const order = await Order.findOne({
+    const owner = ownerIdFrom(req);
+    const transaction = await Transaction.findOne({
       _id: req.params.id,
-      userId: req.user.id,
+      owner,
+      voidedAt: { $exists: false },
     }).session(session);
 
-    if (!order) {
-      throw new Error("Order not found");
+    if (!transaction) throw new Error("Order not found");
+
+    if (req.body.orderStatus === "completed") {
+      const customer = await resolveCustomer({
+        owner,
+        customerId:
+          req.body.customer || req.body.personId || transaction.customer,
+        customerType: req.body.customerType || transaction.customerType,
+        paymentStatus: req.body.paymentStatus,
+        session,
+      });
+      transaction.customer = customer._id;
+      transaction.customerType =
+        req.body.customerType || transaction.customerType;
+      transaction.reference = req.body.reference ?? transaction.reference;
+
+      const completed = await completeTransaction(
+        transaction,
+        req.body,
+        owner,
+        session,
+      );
+      await session.commitTransaction();
+      await completed.transaction.populate("customer", "name phone");
+      return respond(
+        res,
+        200,
+        completed.duplicate ? "Order was already completed" : "Order completed",
+        {
+          transaction: completed.transaction,
+          invoice: completed.invoice,
+          invoiceNumber: completed.invoice?.invoiceNumber || null,
+          duplicate: completed.duplicate,
+        },
+      );
     }
 
-    const wasCompleted = order.orderStatus === "completed";
-
-    const { paymentStatus, orderStatus, personId, notes } = req.body;
-
-    // ❌ prevent reverting
-    if (wasCompleted && orderStatus === "pending") {
-      throw new Error("Cannot revert completed order");
+    if (transaction.orderStatus === "completed") {
+      throw new Error(
+        "Completed orders cannot be edited. Void and recreate if needed.",
+      );
     }
 
-    // ✅ update fields
-    if (personId !== undefined) {
-      order.personId =
-        personId && mongoose.Types.ObjectId.isValid(personId) ? personId : null;
+    if (normalizeCart(req.body).length) {
+      transaction.items = await buildItems(
+        normalizeCart(req.body),
+        owner,
+        session,
+      );
+    }
+    if (req.body.personId !== undefined || req.body.customer !== undefined) {
+      const customer = await resolveCustomer({
+        owner,
+        customerId: req.body.customer || req.body.personId,
+        customerType: req.body.customerType || transaction.customerType,
+        paymentStatus: "paid",
+        session,
+      });
+      transaction.customer = customer._id;
     }
 
-    if (paymentStatus) order.paymentStatus = paymentStatus;
-    if (orderStatus) order.orderStatus = orderStatus.toLowerCase();
-    if (notes) order.notes = notes;
-    //
-    // 🔥 HANDLE COMPLETION (ONLY ONCE)
-    //
-    if (!wasCompleted && order.orderStatus === "completed") {
-      if (!["paid", "debt"].includes(order.paymentStatus)) {
-        throw new Error("Invalid payment status");
-      }
-
-      // 🔥 LEDGER ENTRY
-      if (order.personId && !order.ledgerRecorded) {
-        if (order.paymentStatus === "debt") {
-          await addTransaction({
-            personId: order.personId,
-            kind: "charge",
-            context: "order",
-            amount: order.total,
-            orderId: order._id,
-            paymentMethod: order.paymentMethod,
-            notes: "Order charged to debt",
-            session,
-          });
-        }
-
-        if (order.paymentStatus === "paid") {
-          await addTransaction({
-            personId: order.personId,
-            kind: "payment",
-            context: "order", // 🔥 DOES NOT affect debt
-            amount: order.total,
-            orderId: order._id,
-            paymentMethod: order.paymentMethod,
-            notes: "Order paid",
-            session,
-          });
-        }
-
-        order.ledgerRecorded = true;
-      }
-
-      // 🔥 CREATE INVOICE (SAFE)
-      try {
-        await createInvoiceFromOrder(order._id, req.user.id);
-      } catch (err) {
-        console.error("Invoice failed:", err.message);
-      }
-    }
-
-    await order.save({ session });
+    transaction.customerType =
+      req.body.customerType || transaction.customerType;
+    transaction.reference = req.body.reference ?? transaction.reference;
+    transaction.notes = req.body.notes ?? transaction.notes;
+    await transaction.save({ session });
 
     await session.commitTransaction();
-    session.endSession();
-
-    res.json(order);
+    await transaction.populate("customer", "name phone");
+    respond(res, 200, "Order saved", { transaction });
   } catch (err) {
     await session.abortTransaction();
+    logOrder("update-failed", {
+      orderId: req.params.id,
+      owner: ownerIdFrom(req),
+      message: err.message,
+    });
+    respondError(res, 400, err.message);
+  } finally {
     session.endSession();
-
-    console.error("Update Order Error:", err);
-    res.status(500).json({ error: err.message });
   }
 }
 
-//
-// MARK AS COMPLETED (Shortcut)
-//
 export async function markAsCompleted(req, res) {
+  req.body = {
+    ...req.body,
+    orderStatus: "completed",
+    paymentStatus: req.body.paymentStatus || "paid",
+  };
+  return updateOrder(req, res);
+}
+
+export async function markAsPaid(req, res) {
   try {
-    req.body.orderStatus = "completed";
-    return updateOrder(req, res);
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      owner: ownerIdFrom(req),
+      voidedAt: { $exists: false },
+    });
+    if (!transaction) return respondError(res, 404, "Order not found");
+    if (transaction.balance <= 0)
+      return respond(res, 200, "Order is already paid", transaction);
+
+    req.body = {
+      customer: transaction.customer,
+      transaction: transaction._id,
+      amountPaid: transaction.balance,
+      paymentMethod: req.body.paymentMethod || transaction.paymentMethod,
+      paymentReference: req.body.paymentReference || "",
+      notes: "Debt settled from order",
+    };
+    const { createDebtPayment } = await import("./DebtPaymentController.js");
+    return createDebtPayment(req, res);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logOrder("pay-failed", { orderId: req.params.id, message: err.message });
+    return respondError(res, 500, err.message);
   }
 }
 
-//
-// MARK AS PAID (SAFE)
-//
-export async function markAsPaid(req, res) {
+export async function voidTransaction(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const order = await Order.findOne({
+    const owner = ownerIdFrom(req);
+    const transaction = await Transaction.findOne({
       _id: req.params.id,
-      userId: req.user.id,
+      owner,
+      voidedAt: { $exists: false },
     }).session(session);
 
-    if (!order) throw new Error("Order not found");
+    if (!transaction) throw new Error("Order not found");
 
-    // Only convert debt → paid
-    if (order.paymentStatus === "debt" && order.personId) {
-      await addTransaction({
-        personId: order.personId,
-        kind: "payment",
-        context: "debt", // 🔥 reduces debt
-        amount: order.total,
-        orderId: order._id,
-        paymentMethod: order.paymentMethod,
-        notes: "Debt settled from order",
-        session,
-      });
+    if (transaction.ledgerRecorded) {
+      for (const item of transaction.items) {
+        await Product.updateOne(
+          { _id: item.product, owner },
+          { $inc: { stock: item.quantity } },
+          { session },
+        );
+      }
     }
 
-    order.paymentStatus = "paid";
+    transaction.voidedAt = new Date();
+    transaction.voidReason = req.body.reason || "Voided by user";
+    transaction.orderStatus = "void";
+    await transaction.save({ session });
 
-    await order.save({ session });
+    await Invoice.updateOne(
+      { owner, transaction: transaction._id },
+      { $set: { status: "void" } },
+      { session },
+    );
 
     await session.commitTransaction();
-    session.endSession();
-
-    res.json(order);
+    logOrder("order-voided", { orderId: transaction._id, owner });
+    respond(res, 200, "Order voided", transaction);
   } catch (err) {
     await session.abortTransaction();
+    logOrder("void-failed", { orderId: req.params.id, message: err.message });
+    respondError(res, 400, err.message);
+  } finally {
     session.endSession();
-
-    res.status(500).json({ error: err.message });
   }
 }
 
-//
-// DELETE ORDER
-//
 export async function deleteOrder(req, res) {
-  try {
-    const order = await Order.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    res.json({ message: "Order deleted" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return voidTransaction(req, res);
 }

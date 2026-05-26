@@ -1,277 +1,351 @@
-import Person from "../models/Person.js";
+import mongoose from "mongoose";
+import Customer from "../models/Person.js";
+import Transaction from "../models/Order.js";
+import DebtPayment from "../models/DebtPayment.js";
+import Invoice from "../models/Invoice.js";
+import { respond, respondError } from "../utils/responseHelpers.js";
 
-//
-// HELPERS
-//
-function computeBalance(transactions) {
-  return transactions.reduce((acc, t) => {
-    if (t.kind === "charge") return acc + t.amount;
-    if (t.kind === "payment" && t.context === "debt") return acc - t.amount;
-    return acc;
-  }, 0);
-}
+const ownerIdFrom = (req) => req.user?._id || req.user?.id;
+const pageFrom = (req) => Math.max(1, Number.parseInt(req.query.page ?? 1, 10));
+const limitFrom = (req) =>
+  Math.max(1, Number.parseInt(req.query.limit ?? 20, 10));
+const money = (value) => Math.round(Number(value) || 0);
 
-//
-// PERSON CRUD
-//
+const customerMatch = (owner, query = {}) => {
+  const match = {
+    owner: new mongoose.Types.ObjectId(owner),
+    isDeleted: { $ne: true },
+  };
+  if (query.search) {
+    match.$or = [
+      { name: { $regex: query.search, $options: "i" } },
+      { phone: { $regex: query.search, $options: "i" } },
+    ];
+  }
+  return match;
+};
 
-export async function createPerson(req, res) {
+const withCustomerSummary = (owner) => [
+  {
+    $lookup: {
+      from: "transactions",
+      let: { customerId: "$_id" },
+      pipeline: [
+        {
+          $match: {
+            owner: new mongoose.Types.ObjectId(owner),
+            orderStatus: "completed",
+            voidedAt: { $exists: false },
+            $expr: {
+              $eq: ["$customer", "$$customerId"],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalDebt: { $sum: "$balance" },
+            totalPaid: { $sum: "$amountPaid" },
+            totalOrders: { $sum: 1 },
+            totalSpent: { $sum: "$totalAmount" },
+            lastTransaction: { $max: "$createdAt" },
+          },
+        },
+      ],
+      as: "summaryRows",
+    },
+  },
+  {
+    $addFields: {
+      summary: {
+        $ifNull: [
+          { $first: "$summaryRows" },
+          {
+            totalDebt: 0,
+            totalPaid: 0,
+            totalOrders: 0,
+            totalSpent: 0,
+            lastTransaction: null,
+          },
+        ],
+      },
+    },
+  },
+  {
+    $addFields: {
+      totalDebt: "$summary.totalDebt",
+      totalPaid: "$summary.totalPaid",
+      totalOrders: "$summary.totalOrders",
+      totalSpent: "$summary.totalSpent",
+      lastTransaction: "$summary.lastTransaction",
+      balance: "$summary.totalDebt",
+      contactInfo: "$phone",
+    },
+  },
+  { $project: { summaryRows: 0 } },
+];
+
+export async function getCustomers(req, res) {
   try {
-    const { name, contactInfo, notes } = req.body;
+    const owner = ownerIdFrom(req);
+    const page = pageFrom(req);
+    const limit = limitFrom(req);
+    const sortBy = req.query.sortBy === "totalDebt" ? "totalDebt" : "name";
+    const pipeline = [
+      { $match: customerMatch(owner, req.query) },
+      ...withCustomerSummary(owner),
+    ];
 
-    const person = new Person({
-      userId: req.user.id,
-      name,
-      contactInfo,
-      notes,
-      debts: [],
+    if (req.query.debtStatus === "withDebt")
+      pipeline.push({ $match: { totalDebt: { $gt: 0 } } });
+    if (req.query.debtStatus === "paid")
+      pipeline.push({ $match: { totalDebt: { $lte: 0 } } });
+
+    pipeline.push({
+      $facet: {
+        data: [
+          { $sort: { [sortBy]: sortBy === "totalDebt" ? -1 : 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+        ],
+        meta: [{ $count: "total" }],
+      },
     });
 
-    await person.save();
-    res.json(person);
+    const [result] = await Customer.aggregate(pipeline);
+    const total = result.meta[0]?.total || 0;
+    respond(res, 200, "Customers loaded", result.data, {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 }
 
-export async function getPeople(req, res) {
+export const getPeople = getCustomers;
+
+export async function getCustomerById(req, res) {
   try {
-    const people = await Person.find({ userId: req.user.id }).sort({
-      createdAt: -1,
-    });
+    const owner = ownerIdFrom(req);
+    const page = pageFrom(req);
+    const limit = limitFrom(req);
+    const [customer] = await Customer.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(req.params.id),
+          ...customerMatch(owner),
+        },
+      },
+      ...withCustomerSummary(owner),
+    ]);
 
-    const result = people.map((p) => {
-      const balance = computeBalance(p.debts);
-      return {
-        ...p.toObject(),
-        balance,
-        transactions: p.debts,
-      };
-    });
+    if (!customer) return respondError(res, 404, "Customer not found");
 
-    res.json(result);
+    const [transactions, totalTransactions, recentPayments] = await Promise.all(
+      [
+        Transaction.find({
+          owner,
+          customer: req.params.id,
+          orderStatus: "completed",
+          voidedAt: { $exists: false },
+        })
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .populate("items.product", "name sku"),
+        Transaction.countDocuments({
+          owner,
+          customer: req.params.id,
+          orderStatus: "completed",
+          voidedAt: { $exists: false },
+        }),
+        DebtPayment.find({ owner, customer: req.params.id })
+          .sort({ paidAt: -1 })
+          .limit(10)
+          .populate(
+            "transaction",
+            "createdAt totalAmount balance paymentStatus",
+          )
+          .populate({
+            path: "transaction",
+            populate: { path: "items.product", select: "name" },
+          }),
+      ],
+    );
+
+    const invoices = await Invoice.find({
+      owner,
+      transaction: { $in: transactions.map((transaction) => transaction._id) },
+    });
+    const invoiceByTransaction = new Map(
+      invoices.map((invoice) => [invoice.transaction.toString(), invoice]),
+    );
+
+    respond(res, 200, "Customer loaded", {
+      customer,
+      transactions: transactions.map((transaction) => ({
+        ...transaction.toObject(),
+        invoice: invoiceByTransaction.get(transaction._id.toString()) || null,
+      })),
+      payments: recentPayments,
+      debtSummary: {
+        totalDebt: customer.totalDebt,
+        totalPaid: customer.totalPaid,
+        totalOrders: customer.totalOrders,
+        totalSpent: customer.totalSpent,
+        lastTransaction: customer.lastTransaction,
+      },
+      pagination: {
+        page,
+        limit,
+        total: totalTransactions,
+        pages: Math.ceil(totalTransactions / limit),
+      },
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 }
 
-export async function getPersonById(req, res) {
+export const getPersonById = getCustomerById;
+
+export async function createCustomer(req, res) {
   try {
-    const person = await Person.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
+    const customer = await Customer.create({
+      owner: ownerIdFrom(req),
+      name: req.body.name,
+      phone: req.body.phone ?? req.body.contactInfo ?? "",
+      email: req.body.email ?? "",
+      address: req.body.address ?? "",
     });
-
-    if (!person) return res.status(404).json({ error: "Person not found" });
-
-    const balance = computeBalance(person.debts);
-
-    res.json({
-      ...person.toObject(),
-      balance,
-      transactions: person.debts,
-    });
+    respond(res, 201, "Customer created", customer);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 }
 
-export async function updatePerson(req, res) {
-  try {
-    const { name, contactInfo, notes } = req.body;
+export const createPerson = createCustomer;
 
-    const person = await Person.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { name, contactInfo, notes },
+export async function updateCustomer(req, res) {
+  try {
+    const customer = await Customer.findOneAndUpdate(
+      { _id: req.params.id, owner: ownerIdFrom(req), isDeleted: { $ne: true } },
+      {
+        name: req.body.name,
+        phone: req.body.phone ?? req.body.contactInfo,
+        email: req.body.email,
+        address: req.body.address,
+      },
+      { new: true, runValidators: true },
+    );
+
+    if (!customer) return respondError(res, 404, "Customer not found");
+    respond(res, 200, "Customer updated", customer);
+  } catch (err) {
+    respondError(res, 500, err.message);
+  }
+}
+
+export const updatePerson = updateCustomer;
+
+export async function deleteCustomer(req, res) {
+  try {
+    const owner = ownerIdFrom(req);
+    const unpaid = await Transaction.exists({
+      owner,
+      customer: req.params.id,
+      orderStatus: "completed",
+      balance: { $gt: 0 },
+      voidedAt: { $exists: false },
+    });
+
+    if (unpaid)
+      return respondError(
+        res,
+        409,
+        "Cannot delete a customer with unpaid balance",
+      );
+
+    const customer = await Customer.findOneAndUpdate(
+      { _id: req.params.id, owner },
+      { isDeleted: true, deletedAt: new Date() },
       { new: true },
     );
 
-    if (!person) return res.status(404).json({ error: "Person not found" });
-
-    res.json(person);
+    if (!customer) return respondError(res, 404, "Customer not found");
+    respond(res, 200, "Customer deleted", customer);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    respondError(res, 500, err.message);
   }
 }
 
-export async function deletePerson(req, res) {
-  try {
-    const person = await Person.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    if (!person) return res.status(404).json({ error: "Person not found" });
-
-    res.json({ message: "Person deleted" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
-
-//
-// TRANSACTIONS
-//
+export const deletePerson = deleteCustomer;
 
 export async function addDebt(req, res) {
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const person = await Person.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    if (!person) {
-      return res.status(404).json({ error: "Person not found" });
-    }
-
-    const amount = Number(req.body.amount);
-    const notes = req.body.notes || "";
-
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    const newDebt = {
-      kind: "charge",
-      context: "debt",
-      amount,
-      notes,
-      paymentMethod: "Cash",
-      date: new Date(),
-    };
-
-    person.debts.push(newDebt);
-
-    await person.save();
-
-    res.json(person);
-  } catch (err) {
-    console.error("ADD DEBT ERROR FULL:", err);
-    res.status(500).json({ error: err.message });
-  }
+  return respondError(
+    res,
+    410,
+    "Create a transaction with paymentStatus debt instead",
+  );
 }
 
 export async function addPayment(req, res) {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const person = await Person.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    if (!person) {
-      return res.status(404).json({ error: "Person not found" });
-    }
-
-    const amount = Number(req.body.amount);
-    const notes = req.body.notes || "";
-
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    const newPayment = {
-      kind: "payment",
-      context: "debt",
-      amount,
-      notes,
-      paymentMethod: "Cash",
-      date: new Date(),
-    };
-
-    person.debts.push(newPayment);
-
-    await person.save();
-
-    res.json(person);
+    const { createDebtPayment } = await import("./DebtPaymentController.js");
+    return createDebtPayment(req, res);
   } catch (err) {
-    console.error("FULL ERROR:", err); // 🔥 THIS will finally show truth
-    res.status(500).json({ error: err.message });
+    return respondError(res, 500, err.message);
   }
 }
 
 export async function payAllDebts(req, res) {
   try {
-    const person = await Person.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const owner = ownerIdFrom(req);
+    const [summary] = await Transaction.aggregate([
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(owner),
+          customer: new mongoose.Types.ObjectId(req.params.id),
+          orderStatus: "completed",
+          balance: { $gt: 0 },
+          voidedAt: { $exists: false },
+        },
+      },
+      { $group: { _id: null, balance: { $sum: "$balance" } } },
+    ]);
 
-    if (!person) return res.status(404).json({ error: "Person not found" });
+    if (!summary?.balance)
+      return respond(res, 200, "No outstanding debt", null);
 
-    const balance = computeBalance(person.debts);
-
-    if (balance <= 0) return res.json({ message: "No outstanding debt" });
-
-    person.debts.push({
-      kind: "payment",
-      context: "debt",
-      amount: balance,
+    req.body = {
+      customer: req.params.id,
+      amountPaid: summary.balance,
+      paymentMethod: req.body.paymentMethod || "cash",
       notes: "Full settlement",
-      paymentMethod: "Cash",
-      date: new Date(),
-    });
+    };
 
-    await person.save();
-
-    res.json({ message: "All debts paid" });
+    const { createDebtPayment } = await import("./DebtPaymentController.js");
+    return createDebtPayment(req, res);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return respondError(res, 500, err.message);
   }
 }
 
 export async function updateDebt(req, res) {
-  try {
-    const { id, debtId } = req.params;
-
-    const person = await Person.findOne({
-      _id: id,
-      userId: req.user.id,
-    });
-
-    if (!person) return res.status(404).json({ error: "Person not found" });
-
-    const txn = person.debts.id(debtId);
-
-    if (!txn) return res.status(404).json({ error: "Transaction not found" });
-
-    const { amount, notes } = req.body;
-
-    if (amount !== undefined) txn.amount = amount;
-    if (notes !== undefined) txn.notes = notes;
-
-    await person.save();
-
-    res.json({ message: "Transaction updated" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return respondError(
+    res,
+    410,
+    "Debt entries are now immutable transaction/payment records",
+  );
 }
 
 export async function deleteDebt(req, res) {
-  try {
-    const { id, debtId } = req.params;
-
-    const person = await Person.findOne({
-      _id: id,
-      userId: req.user.id,
-    });
-
-    if (!person) return res.status(404).json({ error: "Person not found" });
-
-    person.debts = person.debts.filter((d) => d._id.toString() !== debtId);
-
-    await person.save();
-
-    res.json({ message: "Transaction deleted" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return respondError(
+    res,
+    410,
+    "Debt entries are now immutable transaction/payment records",
+  );
 }

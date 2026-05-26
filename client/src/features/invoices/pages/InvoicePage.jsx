@@ -79,7 +79,7 @@ export default function InvoicesPage() {
               <p className="font-bold">{inv.invoiceNumber}</p>
 
               <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-                ₱ {inv.total.toFixed(2)}
+                ₱ {inv.total}
               </p>
 
               <p className="text-xs" style={{ color: "var(--color-muted)" }}>

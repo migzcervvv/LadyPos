@@ -1,127 +1,235 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProductApi } from "../services/productApi";
-import ProductCard from "../components/ProductCard";
-import ProductFormModal from "../components/ProductFormModal";
-import ActiveProductsModal from "../components/ActiveProductsModal";
+
+const formatMoney = (centavos = 0) =>
+  `PHP ${(Number(centavos) / 100).toFixed(2)}`;
+const toCentavos = (value) => Math.round((Number(value) || 0) * 100);
+
+const emptyForm = {
+  name: "",
+  sku: "",
+  category: "General",
+  price: "",
+  stock: 0,
+  isActive: true,
+};
 
 export default function ProductPage() {
-  const { getProducts, deleteProduct } = useProductApi();
-
+  const { getProducts, createProduct, updateProduct, deleteProduct } =
+    useProductApi();
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showActiveModal, setShowActiveModal] = useState(false);
-  async function loadProducts() {
-    const res = await getProducts();
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const load = async () => {
+    const res = await getProducts({ limit: 200, search, sortBy: "name" });
     setProducts(res.data);
-  }
+  };
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    load();
+  }, [search]);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
+  const editingProduct = useMemo(
+    () => products.find((product) => product._id === editingId),
+    [products, editingId],
   );
 
-  return (
-    <div
-      className="p-4 pb-24 max-w-5xl mx-auto"
-      style={{
-        backgroundColor: "var(--color-bg)",
-        color: "var(--color-text)",
-        minHeight: "100vh",
-      }}
-    >
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-semibold">Products</h1>
+  const startEdit = (product) => {
+    setEditingId(product?._id || null);
+    setForm(
+      product
+        ? {
+            name: product.name,
+            sku: product.sku || "",
+            category: product.category || "General",
+            price: ((product.price ?? product.sellingPrice ?? 0) / 100).toFixed(
+              2,
+            ),
+            stock: product.stock ?? product.quantity ?? 0,
+            isActive: product.isActive ?? product.active ?? true,
+          }
+        : emptyForm,
+    );
+  };
 
-        <button
-          onClick={() => setShowActiveModal(true)}
-          className="px-4 py-2 rounded-lg text-white"
-          style={{ backgroundColor: "var(--color-secondary)" }}
-        >
-          Set Active (POS)
+  const save = async (event) => {
+    event.preventDefault();
+    const payload = {
+      ...form,
+      price: toCentavos(form.price),
+      stock: Number.parseInt(form.stock, 10) || 0,
+    };
+    if (editingProduct) await updateProduct(editingProduct._id, payload);
+    else await createProduct(payload);
+    setEditingId(null);
+    setForm(emptyForm);
+    load();
+  };
+
+  return (
+    <div className="screen-wrap">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Products</h1>
+        <button className="secondary-action" onClick={() => startEdit(null)}>
+          Add
         </button>
       </div>
 
-      {/* SEARCH */}
       <input
-        className="input w-full mb-4"
-        placeholder="Search product..."
+        className="input mb-4 min-h-11"
+        placeholder="Search name or SKU"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(event) => setSearch(event.target.value)}
       />
 
-      {/* EMPTY STATE */}
-      {filtered.length === 0 && (
-        <div
-          className="text-center mt-16"
-          style={{ color: "var(--color-muted)" }}
-        >
-          <p className="text-lg font-medium">No products yet</p>
+      <form className="inline-form" onSubmit={save}>
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="floating-field">
+            <input
+              id="name"
+              className="input floating-input min-h-11 peer"
+              placeholder=" "
+              value={form.name}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
+            />
+            <label htmlFor="name" className="floating-label">
+              Name
+            </label>
+          </div>
 
-          <p className="text-sm mt-2">
-            Start by adding your first product using the + button below.
-          </p>
+          <div className="floating-field">
+            <input
+              id="sku"
+              className="input floating-input min-h-11 peer"
+              placeholder=" "
+              value={form.sku}
+              onChange={(event) =>
+                setForm({ ...form, sku: event.target.value })
+              }
+            />
+            <label htmlFor="sku" className="floating-label">
+              SKU (Product Code)
+            </label>
+          </div>
+
+          <div className="floating-field">
+            <input
+              id="category"
+              className="input floating-input min-h-11 peer"
+              placeholder=" "
+              value={form.category}
+              onChange={(event) =>
+                setForm({ ...form, category: event.target.value })
+              }
+            />
+            <label htmlFor="category" className="floating-label">
+              Category
+            </label>
+          </div>
+
+          <div className="floating-field">
+            <input
+              id="price"
+              className="input floating-input min-h-11 peer"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              placeholder=" "
+              value={form.price}
+              onChange={(event) =>
+                setForm({ ...form, price: event.target.value })
+              }
+            />
+            <label htmlFor="price" className="floating-label">
+              Price
+            </label>
+          </div>
+
+          <div className="floating-field">
+            <input
+              id="stock"
+              className="input floating-input min-h-11 peer"
+              type="number"
+              inputMode="numeric"
+              placeholder=" "
+              value={form.stock}
+              onChange={(event) =>
+                setForm({ ...form, stock: event.target.value })
+              }
+            />
+            <label htmlFor="stock" className="floating-label">
+              Stock
+            </label>
+          </div>
+
+          <label
+            className="flex min-h-11 items-center gap-2 rounded-lg border px-3"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) =>
+                setForm({ ...form, isActive: event.target.checked })
+              }
+            />
+            Active in POS
+          </label>
         </div>
-      )}
 
-      {/* GRID */}
-      <div className="flex flex-wrap gap-4">
-        {filtered.map((p) => (
-          <ProductCard
-            key={p._id}
-            product={p}
-            onEdit={() => {
-              setSelectedProduct(p);
-              setShowModal(true);
-            }}
-            onDelete={async () => {
-              await deleteProduct(p._id);
-              loadProducts();
-            }}
-          />
-        ))}
-      </div>
+        <button
+          className="primary-action mt-3"
+          disabled={!form.name || !form.price}
+        >
+          {editingProduct ? "Save changes" : "Create product"}
+        </button>
+      </form>
 
-      {/* FLOATING ADD BUTTON */}
-      <button
-        onClick={() => {
-          setSelectedProduct(null);
-          setShowModal(true);
-        }}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-2xl text-white"
-        style={{
-          backgroundColor: "var(--color-primary)",
-        }}
+      <div
+        className="mt-4 divide-y rounded-lg border"
+        style={{ borderColor: "var(--color-border)" }}
       >
-        +
-      </button>
-
-      {/* MODALS */}
-      {showModal && (
-        <ProductFormModal
-          product={selectedProduct}
-          onClose={() => setShowModal(false)}
-          onSuccess={() => {
-            setShowModal(false);
-            loadProducts();
-          }}
-        />
-      )}
-
-      {showActiveModal && (
-        <ActiveProductsModal
-          onClose={() => setShowActiveModal(false)}
-          onSuccess={() => {
-            setShowActiveModal(false);
-            loadProducts();
-          }}
-        />
-      )}
+        {products.map((product) => {
+          const stock = product.stock ?? product.quantity ?? 0;
+          return (
+            <div key={product._id} className="product-row">
+              <div className="min-w-0">
+                <strong className="block truncate">{product.name}</strong>
+                <small className="text-[var(--color-muted)]">
+                  {product.sku || product.category || "General"}
+                </small>
+              </div>
+              <span>{formatMoney(product.price ?? product.sellingPrice)}</span>
+              <span
+                className={`stock-pill ${stock === 0 ? "stock-out" : stock < 10 ? "stock-low" : "stock-ok"}`}
+              >
+                {stock}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="mini-action"
+                  onClick={() => startEdit(product)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="mini-action danger"
+                  onClick={async () => {
+                    await deleteProduct(product._id);
+                    load();
+                  }}
+                >
+                  Off
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

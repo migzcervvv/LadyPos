@@ -2,356 +2,437 @@ import { useEffect, useMemo, useState } from "react";
 import { useProductApi } from "../../products/services/productApi";
 import { usePersonApi } from "../../people/services/api";
 import { useOrderApi } from "../services/ordersApi";
-import { useNavigate } from "react-router";
+import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+
+const formatMoney = (centavos = 0) =>
+  `PHP ${(Number(centavos) / 100).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const toCentavos = (value) => Math.round((Number(value) || 0) * 100);
+
+const statusFor = (amountPaid, total) => {
+  if (total <= 0 || amountPaid <= 0) return "DEBT";
+  if (amountPaid >= total) return "PAID";
+  return "PARTIAL";
+};
 
 export default function POSPage() {
   const { getProducts } = useProductApi();
-  const { getPersons } = usePersonApi();
+  const { getPersons, createPerson } = usePersonApi();
   const { createOrder } = useOrderApi();
-  const [showAddPerson, setShowAddPerson] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [persons, setPersons] = useState([]);
-  const [customerType, setCustomerType] = useState("walkin");
-  const [reference, setReference] = useState("");
-  const [cart, setCart] = useState([]);
-  const [personId, setPersonId] = useState("");
-  const [orderInstructions, setOrderInstructions] = useState("");
-  const navigate = useNavigate();
-  // LOAD DATA
-  useEffect(() => {
-    getProducts().then((res) => setProducts(res.data));
-    getPersons().then((res) => setPersons(res.data));
-  }, []);
-  const activeProducts = useMemo(() => {
-    return products.filter((p) => p.active);
-  }, [products]); // 🧠 ADD TO CART (core logic)
-  const addToCart = (product) => {
-    setCart((prev) => {
-      const exists = prev.find((p) => p.productId === product._id);
 
-      if (exists) {
-        return prev.map((p) =>
-          p.productId === product._id ? { ...p, quantity: p.quantity + 1 } : p,
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [query, setQuery] = useState("");
+  const [cart, setCart] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [amountPaid, setAmountPaid] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const [productRes, customerRes] = await Promise.all([
+      getProducts({ limit: 200, isActive: true, sortBy: "name" }),
+      getPersons({ limit: 200, sortBy: "name" }),
+    ]);
+    setProducts(productRes.data);
+    setCustomers(customerRes.data);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const visibleProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return products.filter((product) => {
+      const isActive = product.isActive ?? product.active;
+      if (!isActive) return false;
+      if (!needle) return true;
+      return `${product.name} ${product.sku || ""}`
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [products, query]);
+
+  const customerOptions = useMemo(() => {
+    const needle = customerSearch.trim().toLowerCase();
+    if (!needle) return customers;
+    return customers.filter((customer) =>
+      `${customer.name} ${customer.phone || customer.contactInfo || ""}`
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [customers, customerSearch]);
+
+  const total = cart.reduce((sum, line) => sum + line.quantity * line.price, 0);
+  const paidCentavos = Math.min(toCentavos(amountPaid), total);
+  const balance = Math.max(0, total - paidCentavos);
+  const status = statusFor(paidCentavos, total);
+  const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+
+  const addToCart = (product) => {
+    if ((product.stock ?? product.quantity ?? 0) <= 0) return;
+    setCartOpen(true);
+    setCart((current) => {
+      const existing = current.find((line) => line.product === product._id);
+      if (existing) {
+        return current.map((line) =>
+          line.product === product._id
+            ? {
+                ...line,
+                quantity: Math.min(
+                  line.quantity + 1,
+                  product.stock ?? product.quantity ?? 0,
+                ),
+              }
+            : line,
         );
       }
-
       return [
-        ...prev,
+        ...current,
         {
-          productId: product._id,
+          product: product._id,
           name: product.name,
-          price: product.sellingPrice,
+          price: product.price ?? product.sellingPrice,
+          stock: product.stock ?? product.quantity ?? 0,
           quantity: 1,
         },
       ];
     });
   };
 
-  const updateQty = (id, qty) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((p) => p.productId !== id));
-      return;
-    }
-
-    setCart((prev) =>
-      prev.map((p) => (p.productId === id ? { ...p, quantity: qty } : p)),
+  const setQuantity = (productId, quantity) => {
+    setCart((current) =>
+      current
+        .map((line) =>
+          line.product === productId
+            ? { ...line, quantity: Math.min(Math.max(0, quantity), line.stock) }
+            : line,
+        )
+        .filter((line) => line.quantity > 0),
     );
   };
 
-  const total = cart.reduce((acc, p) => acc + p.quantity * p.price, 0);
+  const createInlineCustomer = async () => {
+    const name = newCustomerName.trim();
+    if (!name) return;
+    const res = await createPerson({ name, phone: customerSearch });
+    setCustomers((current) => [res.data, ...current]);
+    setCustomerId(res.data._id);
+    setNewCustomerName("");
+  };
 
-  // 🧾 CHECKOUT
-  const handleCheckout = async () => {
-    if (!cart.length) return alert("Cart is empty");
-
+  const submit = async () => {
+    if (!customerId || cart.length === 0) return;
+    setSaving(true);
     try {
       await createOrder({
-        products: cart,
-        personId: customerType === "customer" ? personId : null,
-        customerType,
-        reference: ["grab", "foodpanda"].includes(customerType)
-          ? reference
-          : null,
-        notes: orderInstructions, // ✅ add this
+        orderStatus: "pending",
+        customer: customerId,
+        items: cart.map((line) => ({
+          product: line.product,
+          quantity: line.quantity,
+        })),
+        amountPaid: paidCentavos,
+        paymentMethod,
+        paymentReference,
+        paymentStatus: status,
+        notes,
       });
-
-      // reset
+      toast.success("Sale submitted");
       setCart([]);
-      setPersonId("");
-      setOrderInstructions("");
+      setCartOpen(false);
+      setAmountPaid("");
+      setPaymentReference("");
+      setNotes("");
+      await load();
     } catch (err) {
-      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to submit sale");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <>
-      <div
-        className="h-screen flex flex-col md:flex-row overflow-hidden"
-        style={{
-          backgroundColor: "var(--color-bg)",
-          color: "var(--color-text)",
-        }}
-      >
-        {/* LEFT: PRODUCTS */}
-        <div className="flex-1 md:w-2/3 p-3 md:p-4 overflow-y-auto">
-          <h2 className="text-xl font-bold mb-4">Products</h2>
+    <div className="pos-shell min-h-full overflow-x-hidden pb-24 md:pb-0">
+      <section className="pos-products">
+        <div className="sticky top-0 z-10 bg-[var(--color-bg)] pb-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">POS</h1>
+            <Link
+              className="secondary-action inline-flex items-center justify-center gap-2"
+              to="/orders"
+            >
+              <span aria-hidden="true">#</span>
+              Orders
+            </Link>
+          </div>
+          <input
+            className="input min-h-11"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search or scan products"
+            inputMode="search"
+          />
+        </div>
 
-          <button
-            onClick={() => navigate("/orders")}
-            className="px-3 py-2 mb-4 rounded"
-            style={{ backgroundColor: "var(--color-secondary)" }}
-          >
-            View Orders
-          </button>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {activeProducts.map((p) => (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {visibleProducts.map((product) => {
+            const stock = product.stock ?? product.quantity ?? 0;
+            return (
               <button
-                key={p._id}
-                onClick={() => addToCart(p)}
-                className="p-3 rounded-lg text-left"
+                key={product._id}
+                onClick={() => addToCart(product)}
+                disabled={stock <= 0}
+                className="min-h-32 rounded-lg border p-3 text-left transition active:scale-[0.99] disabled:opacity-50"
                 style={{
-                  backgroundColor: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
                 }}
               >
-                <p className="font-medium">{p.name}</p>
-                <p style={{ color: "var(--color-muted)" }}>
-                  ₱ {p.sellingPrice}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* RIGHT: CART */}
-        <div
-          className="max-h-[65%] md:h-auto md:w-1/3 p-3 md:p-4 flex flex-col border-t md:border-t-0 md:border-l overflow-auto"
-          style={{
-            borderColor: "var(--color-border)",
-            backgroundColor: "var(--color-surface)",
-          }}
-        >
-          <div className="mb-3">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-bold">Cart</h2>
-
-              <button
-                onClick={() => setShowAddPerson(true)}
-                className="hidden md:block px-3 py-1 rounded text-sm"
-                style={{ backgroundColor: "var(--color-secondary)" }}
-              >
-                + Add
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowAddPerson(true)}
-              className="w-full py-2 rounded md:hidden"
-              style={{ backgroundColor: "var(--color-secondary)" }}
-            >
-              + Add Customer
-            </button>
-          </div>
-
-          {/* CUSTOMER TYPE */}
-          <div className="mb-3">
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              {["walkin", "customer", "grab", "foodpanda"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    setCustomerType(type);
-                    setReference("");
-                    if (type !== "customer") setPersonId("");
-                  }}
-                  className="py-2 rounded-lg text-sm font-medium"
-                  style={{
-                    backgroundColor:
-                      customerType === type
-                        ? "var(--color-primary)"
-                        : "transparent",
-                    color: customerType === type ? "#fff" : "var(--color-text)",
-                    border:
-                      customerType === type
-                        ? "none"
-                        : "1px solid var(--color-border)",
-                  }}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-
-            {customerType === "customer" && (
-              <select
-                className="input w-full"
-                value={personId}
-                onChange={(e) => setPersonId(e.target.value)}
-              >
-                <option value="">Select Customer</option>
-                {persons.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {(customerType === "grab" || customerType === "foodpanda") && (
-              <input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder={`${customerType} reference (optional)`}
-                className="input w-full"
-              />
-            )}
-          </div>
-
-          {/* NOTES */}
-          <div className="mb-3">
-            <label
-              className="block text-sm mb-1"
-              style={{ color: "var(--color-muted)" }}
-            >
-              Order instructions
-            </label>
-
-            <textarea
-              value={orderInstructions}
-              onChange={(e) => setOrderInstructions(e.target.value)}
-              placeholder="Add notes for this order..."
-              className="input w-full"
-              rows={2}
-            />
-          </div>
-
-          {/* CART ITEMS */}
-          <div
-            className="flex-1 overflow-y-auto mb-4"
-            style={{ maxHeight: "60vh", minHeight: "15vh" }}
-          >
-            {cart.length === 0 && (
-              <p style={{ color: "var(--color-muted)" }}>No items yet</p>
-            )}
-
-            {cart.map((p) => (
-              <div
-                key={p.productId}
-                className="mb-3 flex justify-between items-center"
-              >
-                <div>
-                  <p>{p.name}</p>
-                  <p style={{ color: "var(--color-muted)" }}>₱ {p.price}</p>
+                <div className="flex h-full flex-col justify-between gap-3">
+                  <p className="break-words text-sm font-semibold leading-snug">
+                    {product.name}
+                  </p>
+                  <div className="space-y-2">
+                    <p className="text-base font-bold">
+                      {formatMoney(product.price ?? product.sellingPrice)}
+                    </p>
+                    <span
+                      className={`stock-pill ${stock === 0 ? "stock-out" : stock < 10 ? "stock-low" : "stock-ok"}`}
+                    >
+                      {stock} left
+                    </span>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => updateQty(p.productId, p.quantity - 1)}
-                    className="px-2 rounded border"
-                    style={{ borderColor: "var(--color-border)" }}
-                  >
-                    -
-                  </button>
-
-                  <span>{p.quantity}</span>
-
-                  <button
-                    onClick={() => updateQty(p.productId, p.quantity + 1)}
-                    className="px-2 rounded border"
-                    style={{ borderColor: "var(--color-border)" }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* TOTAL */}
-          <div className="mb-4 font-bold text-lg">Total: ₱ {total}</div>
-
-          {/* CHECKOUT */}
-          <button
-            onClick={handleCheckout}
-            className="py-3 rounded text-white"
-            style={{ backgroundColor: "var(--color-primary)" }}
-          >
-            Checkout
-          </button>
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      {showAddPerson && (
-        <AddPersonModal
-          onClose={() => setShowAddPerson(false)}
-          onCreated={(newPerson) => {
-            setPersons((prev) => [...prev, newPerson]);
-            setPersonId(newPerson._id);
-          }}
+      <aside className={`pos-cart ${cartOpen ? "is-open" : ""}`}>
+        <button
+          className="md:hidden cart-grip"
+          onClick={() => setCartOpen((open) => !open)}
+          aria-label="Toggle cart"
         />
-      )}
-    </>
+        <CartPanel
+          cart={cart}
+          total={total}
+          customerId={customerId}
+          setCustomerId={setCustomerId}
+          customerSearch={customerSearch}
+          setCustomerSearch={setCustomerSearch}
+          customerOptions={customerOptions}
+          newCustomerName={newCustomerName}
+          setNewCustomerName={setNewCustomerName}
+          createInlineCustomer={createInlineCustomer}
+          amountPaid={amountPaid}
+          setAmountPaid={setAmountPaid}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          paymentReference={paymentReference}
+          setPaymentReference={setPaymentReference}
+          balance={balance}
+          status={status}
+          notes={notes}
+          setNotes={setNotes}
+          setQuantity={setQuantity}
+          submit={submit}
+          saving={saving}
+        />
+      </aside>
+
+      <button
+        className="cart-summary md:hidden"
+        onClick={() => setCartOpen(true)}
+      >
+        <span>{itemCount} items</span>
+        <strong>{formatMoney(total)}</strong>
+        <span>Checkout</span>
+      </button>
+    </div>
   );
 }
 
-function AddPersonModal({ onClose, onCreated }) {
-  const { createPerson } = usePersonApi();
-  const [name, setName] = useState("");
-
-  const handleSubmit = async () => {
-    if (!name.trim()) return;
-
-    const res = await createPerson({ name });
-    onCreated(res.data);
-    onClose();
-  };
-
+function CartPanel({
+  cart,
+  total,
+  customerId,
+  setCustomerId,
+  customerSearch,
+  setCustomerSearch,
+  customerOptions,
+  newCustomerName,
+  setNewCustomerName,
+  createInlineCustomer,
+  amountPaid,
+  setAmountPaid,
+  paymentMethod,
+  setPaymentMethod,
+  paymentReference,
+  setPaymentReference,
+  balance,
+  status,
+  notes,
+  setNotes,
+  setQuantity,
+  submit,
+  saving,
+}) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-    >
-      <div
-        className="w-full md:max-w-sm rounded-t-2xl md:rounded-xl p-4"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-        }}
-      >
-        <div
-          className="w-10 h-1 rounded mx-auto mb-3 md:hidden"
-          style={{ backgroundColor: "var(--color-border)" }}
-        />
+    <div className="flex h-full flex-col gap-4 overflow-y-scroll">
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Cart</h1>
+          <strong>{formatMoney(total)}</strong>
+        </div>
 
-        <h3 className="text-lg font-semibold mb-3">New Customer</h3>
-
-        <input
-          className="input w-full mb-4"
-          placeholder="Enter name..."
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={handleSubmit}
-            className="w-full py-3 rounded text-white"
-            style={{ backgroundColor: "var(--color-primary)" }}
-          >
-            Save Customer
-          </button>
-
-          <button
-            onClick={onClose}
-            className="w-full py-2 rounded border"
-            style={{ borderColor: "var(--color-border)" }}
-          >
-            Cancel
-          </button>
+        <div className="max-h-52 space-y-2 overflow-y-auto pr-1 md:max-h-72">
+          {cart.length === 0 && (
+            <p className="text-sm text-[var(--color-muted)]">No items yet</p>
+          )}
+          {cart.map((line) => (
+            <div key={line.product} className="cart-line">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{line.name}</p>
+                <p className="text-xs text-[var(--color-muted)]">
+                  {formatMoney(line.price)} x {line.quantity}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  className="qty-button"
+                  onClick={() => setQuantity(line.product, line.quantity - 1)}
+                >
+                  -
+                </button>
+                <span className="w-7 text-center text-sm">{line.quantity}</span>
+                <button
+                  className="qty-button"
+                  onClick={() => setQuantity(line.product, line.quantity + 1)}
+                >
+                  +
+                </button>
+              </div>
+              <strong className="text-right text-sm">
+                {formatMoney(line.price * line.quantity)}
+              </strong>
+            </div>
+          ))}
         </div>
       </div>
+
+      <div className="space-y-3">
+        <div className="grid gap-2">
+          <input
+            className="input min-h-11"
+            placeholder="Find customer"
+            value={customerSearch}
+            onChange={(event) => setCustomerSearch(event.target.value)}
+          />
+          <select
+            className="input min-h-11"
+            value={customerId}
+            onChange={(event) => setCustomerId(event.target.value)}
+          >
+            <option value="">Select customer</option>
+            {customerOptions.map((customer) => (
+              <option key={customer._id} value={customer._id}>
+                {customer.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <input
+              className="input min-h-11"
+              placeholder="New customer"
+              value={newCustomerName}
+              onChange={(event) => setNewCustomerName(event.target.value)}
+            />
+            <button
+              className="secondary-action"
+              onClick={createInlineCustomer}
+              type="button"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        <input
+          className="input min-h-11"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          value={amountPaid}
+          onChange={(event) => setAmountPaid(event.target.value)}
+          placeholder="Amount paid"
+        />
+
+        <div className="grid grid-cols-4 gap-2">
+          {["cash", "gcash", "bank", "credit"].map((item) => (
+            <button
+              key={item}
+              className={`pay-method ${paymentMethod === item ? "selected" : ""}`}
+              onClick={() => setPaymentMethod(item)}
+              type="button"
+            >
+              {item.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {["gcash", "bank"].includes(paymentMethod) && (
+          <input
+            className="input min-h-11"
+            value={paymentReference}
+            onChange={(event) => setPaymentReference(event.target.value)}
+            placeholder={
+              paymentMethod === "bank"
+                ? "Bank reference number"
+                : "GCash reference number"
+            }
+          />
+        )}
+
+        <div className="balance-row">
+          <span>{status}</span>
+          <strong>{formatMoney(balance)} balance</strong>
+        </div>
+
+        <textarea
+          className="input min-h-20"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Notes"
+        />
+      </div>
+
+      <button
+        className="primary-action"
+        disabled={
+          !customerId ||
+          cart.length === 0 ||
+          saving ||
+          (["gcash", "bank"].includes(paymentMethod) &&
+            !paymentReference.trim())
+        }
+        onClick={submit}
+      >
+        {saving ? "Saving..." : "Submit sale"}
+      </button>
     </div>
   );
 }

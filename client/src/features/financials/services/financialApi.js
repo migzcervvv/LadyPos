@@ -2,29 +2,15 @@ import { useApi } from "../../../shared/utils/useApi";
 
 export function useFinancialApi() {
   const api = useApi();
+  const data = (res) => res.data?.data ?? res.data;
 
-  const getSummary = async (range = "daily") => {
-    const res = await api.get(`/financials/summary`, {
-      params: { range },
-    });
-    return res.data;
-  };
+  const getSummary = async () => data(await api.get("/dashboard/summary"));
 
-  const getDashboard = async () => {
-    const res = await api.get(`/financials/dashboard`);
-    return res;
-  };
-
-  const getDayDetails = async (date) => {
-    if (!date) throw new Error("date is required");
-
-    const res = await api.get(`/financials/day/${date}`);
-    return res;
-  };
+  const getRevenueByRange = async (range = "daily", from, to) =>
+    data(await api.get("/dashboard/revenue", { params: { range, from, to } }));
 
   return {
     getSummary,
-    getDashboard,
-    getDayDetails,
+    getRevenueByRange,
   };
 }

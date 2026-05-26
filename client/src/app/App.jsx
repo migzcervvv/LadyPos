@@ -14,6 +14,7 @@ import InvoicesPage from "../features/invoices/pages/InvoicePage.jsx";
 import ExpensePage from "../features/financials/pages/ExpensePage.jsx";
 import { LoadingScreen } from "../shared/components/LoadingScreen.jsx";
 import { useServerReady } from "../shared/utils/useServerReady.js";
+import { Toaster } from "react-hot-toast";
 
 const router = createBrowserRouter([
   {
@@ -43,7 +44,15 @@ const router = createBrowserRouter([
             element: <PersonsPage />,
           },
           {
+            path: "/customers/:id",
+            element: <PersonsPage />,
+          },
+          {
             path: "/orders",
+            element: <OrdersPage />,
+          },
+          {
+            path: "/transactions",
             element: <OrdersPage />,
           },
           {
@@ -56,6 +65,10 @@ const router = createBrowserRouter([
           },
           {
             path: "/finances",
+            element: <FinancialPage />,
+          },
+          {
+            path: "/dashboard",
             element: <FinancialPage />,
           },
           {
@@ -78,5 +91,10 @@ export default function App() {
   if (!ready) {
     return <LoadingScreen />;
   }
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster position="top-center" toastOptions={{ duration: 2800 }} />
+    </>
+  );
 }

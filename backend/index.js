@@ -4,10 +4,14 @@ import { connectDB } from "./config/config.js";
 import userRoutes from "./routes/UserRoute.js";
 import productRoutes from "./routes/ProductRoute.js";
 import personRoutes from "./routes/PersonRoute.js";
+import customerRoutes from "./routes/CustomerRoute.js";
 import orderRoutes from "./routes/OrderRoute.js";
+import transactionRoutes from "./routes/TransactionRoute.js";
 import financialRoutes from "./routes/FinancialRoute.js";
 import invoiceRoutes from "./routes/InvoiceRoute.js";
 import expenseRoutes from "./routes/ExpenseRoute.js";
+import debtPaymentRoutes from "./routes/DebtPaymentRoute.js";
+import dashboardRoutes from "./routes/DashboardRoute.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import { logger } from "./middleware/logger.js";
 import cors from "cors";
@@ -21,34 +25,41 @@ app.use(logger);
 
 const logs = [];
 const clients = [];
-
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
 function pushLog(level, message) {
   const time = new Date().toLocaleTimeString();
 
-  const log = {
-    time,
-    level,
-    message,
-  };
+  const log = { time, level, message };
 
   logs.push(log);
+
   if (logs.length > 300) logs.shift();
 
-  // send to all connected clients (SSE)
   clients.forEach((res) => {
     res.write(`data: ${JSON.stringify(log)}\n\n`);
   });
 
-  // still log to console
-  console._log(`[${time}] [${level.toUpperCase()}] ${message}`);
+  if (level === "info") originalLog(message);
+  if (level === "warn") originalWarn(message);
+  if (level === "error") originalError(message);
 }
 
 // preserve originals
 console._log = console.log;
 
-console.log = (msg) => pushLog("info", msg);
-console.warn = (msg) => pushLog("warn", msg);
-console.error = (msg) => pushLog("error", msg);
+console.log = (...args) => {
+  pushLog("info", args.map(String).join(" "));
+};
+
+console.warn = (...args) => {
+  pushLog("warn", args.map(String).join(" "));
+};
+
+console.error = (...args) => {
+  pushLog("error", args.map(String).join(" "));
+};
 // Logging middleware to capture all incoming requests
 
 app.use((req, res, next) => {
@@ -187,13 +198,17 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/people", personRoutes);
+app.use("/api/customers", customerRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/transactions", transactionRoutes);
 app.use("/api/financials", financialRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/invoices", invoiceRoutes);
+app.use("/api/debt-payments", debtPaymentRoutes);
 app.use("/api/expenses", expenseRoutes);
 
 app.use(errorHandler);
-
+console.log("Starting server...", process.env.MONGO_URI);
 app.listen(5000, () => {
   connectDB();
   console.log("Server is listening on port http://localhost:5000");

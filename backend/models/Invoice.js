@@ -1,46 +1,54 @@
 import mongoose from "mongoose";
-import { Schema as _Schema, model } from "mongoose";
-const Schema = _Schema;
 
-const invoiceItemSchema = new Schema({
-  productName: String,
-  quantity: Number,
-  price: Number,
-  total: Number,
+const { Schema, model } = mongoose;
+
+const invoiceSchema = new Schema(
+  {
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    customer: {
+      type: Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true,
+      index: true,
+    },
+    transaction: {
+      type: Schema.Types.ObjectId,
+      ref: "Transaction",
+      required: true,
+      index: true,
+    },
+    invoiceNumber: { type: String, required: true },
+    issuedAt: { type: Date, default: Date.now, index: true },
+    dueDate: Date,
+    status: {
+      type: String,
+      enum: ["unpaid", "partial", "paid", "void"],
+      default: "unpaid",
+      index: true,
+    },
+    notes: { type: String, default: "" },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
+);
+
+invoiceSchema.virtual("userId").get(function getUserId() {
+  return this.owner;
 });
 
-const invoiceSchema = new Schema({
-  invoiceNumber: { type: String, required: true },
-  userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
-  orderId: { type: Schema.Types.ObjectId, ref: "Order" },
-  customer: {
-    name: String,
-    phone: String,
-    address: String,
-    type: { type: String, enum: ["Walk-in", "Regular", "VIP"] },
-  },
-
-  items: [invoiceItemSchema],
-
-  subtotal: Number,
-  tax: { type: Number, default: 0 },
-  discount: { type: Number, default: 0 },
-  total: Number,
-
-  status: {
-    type: String,
-    enum: ["pending", "completed", "paid"],
-    default: "completed",
-  },
-
-  issuedAt: { type: Date, default: Date.now },
-  paidAt: Date,
-
-  notes: String,
+invoiceSchema.virtual("orderId").get(function getOrderId() {
+  return this.transaction;
 });
 
-// 🔥 THIS is the important part
-invoiceSchema.index({ invoiceNumber: 1, userId: 1 }, { unique: true });
+invoiceSchema.index({ owner: 1, invoiceNumber: 1 });
+invoiceSchema.index({ owner: 1, transaction: 1 });
 
-export default mongoose.model("Invoice", invoiceSchema);
+export default model("Invoice", invoiceSchema);

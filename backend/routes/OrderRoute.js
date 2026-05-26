@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
   createOrder,
   getOrders,
@@ -7,9 +7,10 @@ import {
   deleteOrder,
   markAsPaid,
   markAsCompleted,
-} from '../controllers/OrderController.js';
+  voidTransaction,
+} from "../controllers/OrderController.js";
 
-import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -17,21 +18,22 @@ const router = Router();
 router.use(protect);
 
 // Create order (any logged-in user)
-router.post('/', createOrder);
+router.post("/", createOrder);
 
 // Get orders
-router.get('/', getOrders);
+router.get("/", getOrders);
 
 // Get single order
-router.get('/:id', getOrderById);
+router.get("/:id", getOrderById);
 
 // Update order (owner or admin)
-router.put('/:id', updateOrder);
+router.put("/:id", updateOrder);
 
-router.patch('/:id/pay', protect, markAsPaid);
-router.patch('/:id/complete', protect, markAsCompleted);
+router.patch("/:id/pay", protect, markAsPaid);
+router.patch("/:id/complete", protect, markAsCompleted);
+router.patch("/:id/void", protect, voidTransaction);
 
 // Delete order (owner or admin)
-router.delete('/:id', deleteOrder);
+router.delete("/:id", deleteOrder);
 
 export default router;
