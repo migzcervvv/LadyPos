@@ -144,10 +144,12 @@ export const updatePassword = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  if (req.body.password) {
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
+  if (!(await user.matchPassword(currentPassword))) {
+    res.status(401);
+    throw new Error("Current password is incorrect");
   }
+
+  user.password = newPassword; // pre-save hook hashes
   await user.save();
   res.json({ message: "Password updated" });
 });
@@ -199,8 +201,10 @@ export const updateUser = asyncHandler(async (req, res) => {
   if (name !== undefined) user.name = name;
   if (phone !== undefined) user.phone = phone;
   if (address !== undefined) user.address = address;
-  if (password) user.password = password; // pre-save hook hashes
-
+  if (password) {
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+  }
   const updated = await user.save();
   const result = updated.toObject();
   delete result.password;
