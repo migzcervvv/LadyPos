@@ -2,6 +2,7 @@
 import asyncHandler from "express-async-handler";
 import User from "../models/User.js";
 import { generateToken } from "../utils/generateToken.js";
+import bcrypt from "bcryptjs";
 
 // ─── Public ──────────────────────────────────────────────────────────────────
 
@@ -53,8 +54,11 @@ export const loginUser = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ identifier: identifier.toLowerCase() });
+  const passwordCorrect = user
+    ? await bcrypt.compare(password, user.password)
+    : false;
 
-  if (!user || !(await user.matchPassword(password))) {
+  if (!user || !passwordCorrect) {
     res.status(401);
     throw new Error("Invalid credentials");
   }
@@ -140,12 +144,10 @@ export const updatePassword = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  if (!(await user.matchPassword(currentPassword))) {
-    res.status(401);
-    throw new Error("Current password is incorrect");
+  if (req.body.password) {
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(req.body.password, salt);
   }
-
-  user.password = newPassword; // pre-save hook hashes
   await user.save();
   res.json({ message: "Password updated" });
 });
