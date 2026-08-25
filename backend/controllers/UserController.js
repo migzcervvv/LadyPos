@@ -213,7 +213,7 @@ export const updateUser = asyncHandler(async (req, res) => {
 
 // DELETE /api/users/:id
 export const deleteUser = asyncHandler(async (req, res) => {
-  if (req.params.id === req.user._id.toString()) {
+  if (req.params.id === req.user._id) {
     res.status(400);
     throw new Error("Cannot delete your own account");
   }
