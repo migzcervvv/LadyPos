@@ -58,7 +58,7 @@ function SidebarContent({
     <>
       {/* Header */}
       <div className="h-16 flex items-center justify-between border-b border-[var(--color-border)] px-4 flex-shrink-0">
-        <img src="/serveflow.svg" alt="ServeFlow" className="h-10 w-auto" />
+        <img src="/serveflow.svg" alt="ServeFlow" className="h-16 w-auto" />
 
         {showClose && (
           <button

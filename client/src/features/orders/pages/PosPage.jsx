@@ -257,16 +257,14 @@ export default function POSPage() {
         />
       </aside>
 
-      {!cartOpen && (
-        <button
-          className="cart-summary min-[1180px]:hidden lg:w-[calc(50%-24px)]"
-          onClick={() => setCartOpen(true)}
-        >
-          <span>{itemCount} items</span>
-          <strong>{formatMoney(total)}</strong>
-          <span>Checkout</span>
-        </button>
-      )}
+      <button
+        className={`cart-summary lg:w-[calc(50%-24px)] min-[1180px]:hidden ${cartOpen ? "cart-summary-hidden" : ""}`}
+        onClick={() => setCartOpen(true)}
+      >
+        <span>{itemCount} items</span>
+        <strong>{formatMoney(total)}</strong>
+        <span>Checkout</span>
+      </button>
     </div>
   );
 }

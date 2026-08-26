@@ -17,17 +17,17 @@
 
 /* Dark mode (optional future-proofing) */
 [data-theme="dark"] {
-  --color-primary: #2dd4bf;
-  --color-secondary: #1e293b;
-  --color-accent: #fbbf24;
-  --color-danger: #f87171;
-  --color-success: #4ade80;
-  --color-warning: #facc15;
-  --color-bg: #0f172a;
-  --color-surface: #111827;
-  --color-text: #f8fafc;
-  --color-muted: #94a3b8;
-  --color-border: #243044;
+  --color-primary: #6d83c9; /* soft periwinkle-blue, like moonlight on water */
+  --color-secondary: #1b2036; /* deep indigo, used for secondary surfaces/highlights */
+  --color-accent: #b08d57; /* muted brass/gold, warm contrast against cool base */
+  --color-danger: #b3595a; /* dusty rose-red, muted not alarming */
+  --color-success: #5c8b6e; /* deep sage, calm confirmation color */
+  --color-warning: #a68a4d; /* muted ochre, low-key caution */
+  --color-bg: #0a0e1a; /* near-black midnight blue base */
+  --color-surface: #141a2e; /* elevated indigo-navy for cards/panels */
+  --color-text: #d6dae8; /* soft lavender-white, not stark white */
+  --color-muted: #7c85a3; /* dim periwinkle-gray for secondary text */
+  --color-border: #232b47; /* deep indigo border, visible but unobtrusive */
 }
 
 /* 🔥 Base Reset (Tailwind-friendly) */
@@ -180,11 +180,35 @@ html {
   transform: translateY(0);
 }
 
+/* 1. Force the inner elements to strictly manage vertical overflow */
 .pos-cart .overflow-y-auto,
 .cart-line-list {
+  overflow-y: auto !important; /* Ensures layout isolates the scroll domain */
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   touch-action: pan-y;
+
+  /* Hides standard track in Firefox and legacy IE/Edge */
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* 2. Completely zero out the entire WebKit scrollbar structural track */
+.pos-cart .overflow-y-auto::-webkit-scrollbar,
+.cart-line-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* 3. Explicitly kill the hardware up/down arrow buttons */
+.pos-cart .overflow-y-auto::-webkit-scrollbar-button,
+.cart-line-list::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .cart-summary {
@@ -204,7 +228,9 @@ html {
   padding: 0 14px;
   text-align: left;
 }
-
+.cart-summary-hidden {
+  display: none;
+}
 .cart-summary span:last-child {
   text-align: right;
 }
@@ -733,6 +759,12 @@ html {
   .sheet-backdrop {
     align-items: center;
     justify-content: center;
+  }
+
+  .cart-summary {
+    right: 320px;
+    left: 320px;
+    bottom: 34px;
   }
 }
 
