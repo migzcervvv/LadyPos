@@ -322,10 +322,6 @@ export default function Layout() {
                 </svg>
               </button>
             )}
-
-            <span className="font-semibold text-[var(--color-text)]">
-              Dashboard
-            </span>
           </div>
         </header>
 

@@ -156,6 +156,11 @@ html {
 }
 
 .pos-cart {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   position: fixed;
   z-index: 35;
   right: 0;
@@ -173,6 +178,13 @@ html {
 
 .pos-cart.is-open {
   transform: translateY(0);
+}
+
+.pos-cart .overflow-y-auto,
+.cart-line-list {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
 }
 
 .cart-summary {
@@ -536,7 +548,8 @@ html {
 
 .order-card.selected {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary), transparent 82%);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--color-primary), transparent 82%);
 }
 
 .order-main {
@@ -686,7 +699,7 @@ html {
   color: var(--color-primary);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1180px) {
   .pos-shell {
     grid-template-columns: minmax(0, 1fr) 380px;
     align-items: start;
@@ -700,6 +713,7 @@ html {
     border: 1px solid var(--color-border);
     border-radius: 8px;
     box-shadow: none;
+    overflow-y: scroll;
   }
 
   .kpi-grid {

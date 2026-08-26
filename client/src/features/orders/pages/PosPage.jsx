@@ -13,9 +13,10 @@ const formatMoney = (centavos = 0) =>
 
 const toCentavos = (value) => Math.round((Number(value) || 0) * 100);
 
-const statusFor = (amountPaid, total) => {
+const statusFor = (amountPaid, total, changeDue) => {
   if (total <= 0 || amountPaid <= 0) return "DEBT";
-  if (amountPaid >= total) return "PAID";
+  if (amountPaid == total) return "PAID";
+  if (changeDue > 0) return "CHANGE DUE";
   return "PARTIAL";
 };
 
@@ -75,13 +76,14 @@ export default function POSPage() {
 
   const total = cart.reduce((sum, line) => sum + line.quantity * line.price, 0);
   const paidCentavos = Math.min(toCentavos(amountPaid), total);
+  const rawPaidCentavos = toCentavos(amountPaid);
+  const changeDue = Math.max(0, rawPaidCentavos - total);
   const balance = Math.max(0, total - paidCentavos);
-  const status = statusFor(paidCentavos, total);
+  const status = statusFor(paidCentavos, total, changeDue);
   const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   const addToCart = (product) => {
     if ((product.stock ?? product.quantity ?? 0) <= 0) return;
-    setCartOpen(true);
     setCart((current) => {
       const existing = current.find((line) => line.product === product._id);
       if (existing) {
@@ -163,7 +165,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="pos-shell min-h-full overflow-x-hidden pb-24 md:pb-0">
+    <div className="pos-shell min-h-full overflow-x-hidden overflow-y-scroll pb-24 min-[1180px]:pb-0">
       <section className="pos-products">
         <div className="sticky top-0 z-10 bg-[var(--color-bg)] pb-3">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -222,7 +224,7 @@ export default function POSPage() {
 
       <aside className={`pos-cart ${cartOpen ? "is-open" : ""}`}>
         <button
-          className="md:hidden cart-grip"
+          className="min-[1180px]:hidden cart-grip"
           onClick={() => setCartOpen((open) => !open)}
           aria-label="Toggle cart"
         />
@@ -250,17 +252,21 @@ export default function POSPage() {
           setQuantity={setQuantity}
           submit={submit}
           saving={saving}
+          changeDue={changeDue}
+          setCartOpen={setCartOpen}
         />
       </aside>
 
-      <button
-        className="cart-summary md:hidden"
-        onClick={() => setCartOpen(true)}
-      >
-        <span>{itemCount} items</span>
-        <strong>{formatMoney(total)}</strong>
-        <span>Checkout</span>
-      </button>
+      {!cartOpen && (
+        <button
+          className="cart-summary min-[1180px]:hidden lg:w-[calc(50%-24px)]"
+          onClick={() => setCartOpen(true)}
+        >
+          <span>{itemCount} items</span>
+          <strong>{formatMoney(total)}</strong>
+          <span>Checkout</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -289,16 +295,26 @@ function CartPanel({
   setQuantity,
   submit,
   saving,
+  changeDue,
+  setCartOpen,
 }) {
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-scroll">
+    <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto">
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Cart</h1>
           <strong>{formatMoney(total)}</strong>
+          <button
+            className="min-[1180px]:hidden mini-action"
+            onClick={() => setCartOpen(false)}
+            aria-label="Close cart"
+            type="button"
+          >
+            Close
+          </button>
         </div>
 
-        <div className="max-h-52 space-y-2 overflow-y-auto pr-1 md:max-h-72">
+        <div className="cart-line-list max-h-52 space-y-2 overflow-y-auto pr-1 md:max-h-72">
           {cart.length === 0 && (
             <p className="text-sm text-[var(--color-muted)]">No items yet</p>
           )}
@@ -409,7 +425,13 @@ function CartPanel({
 
         <div className="balance-row">
           <span>{status}</span>
-          <strong>{formatMoney(balance)} balance</strong>
+          {changeDue > 0 ? (
+            <strong style={{ color: "var(--color-success)" }}>
+              {formatMoney(changeDue)} change
+            </strong>
+          ) : (
+            <strong>{formatMoney(balance)} balance</strong>
+          )}
         </div>
 
         <textarea
@@ -421,7 +443,7 @@ function CartPanel({
       </div>
 
       <button
-        className="primary-action"
+        className="primary-action mb-16"
         disabled={
           !customerId ||
           cart.length === 0 ||
